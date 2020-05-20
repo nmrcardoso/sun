@@ -4,8 +4,6 @@
 #include <iostream>
 #include <iomanip>
 
-
-
 #include <timer.h>
 #include <cuda_common.h>
 #include <device_load_save.h>
