@@ -31,7 +31,7 @@
 #include <cub/cub.cuh>
 
 #include <meas/wloopex.h>
-
+#include<vector>
 
 using namespace std;
 
@@ -235,7 +235,7 @@ DEVICE msun MO1(WLOPArg<Real> arg,int id, int lx, int ly, int muvolume){
 //      MO2                          //
 ///////////////////////////////////////
 template<bool UseTex, class Real, ArrayType atype> 
-DEVICE msun MO2(WLOPArg<Real> arg,int id, int lx1,int lx2, int ly, int muvolume){
+DEVICE msun MO2(WLOPArg<Real> arg,int id, int lx1, int ly, int lx2, int muvolume){
 	msun mop = msun::zero();
 	{
 	int dir1 = arg.mu;
@@ -855,61 +855,55 @@ __global__ void kernel_CalcOPsF_A0_33(WLOPArg<Real> arg){
 //      new operator section                 //
 ///////////////////////////////////////////////
 {
-msun mop=MO0<UseTex, Real, atype>(arg, id, 1,  muvolume); //lx=1
-mop/=(2.0);
-GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + 4 * DEVPARAMS::Volume, gfoffset1);
+int index=3;
+// this part is for set MO0
+{ 
+int set0_l[4]={1, 2, 3, 4};
+int n=sizeof(set0_l)/sizeof(int);
+for(uint i=0;i<n;i++){
+	{
+	index++;
+	msun mop=MO0<UseTex, Real, atype>(arg, id, set0_l[i],  muvolume);
+	mop/=(2.0);
+	GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + index * DEVPARAMS::Volume, gfoffset1);
+	}
 }
-///////////////////////////////////////
+} 
+///////////////////////////
+// this part is for set2 MO1
 {
-msun mop=MO0<UseTex, Real, atype>(arg, id, 2,  muvolume);//lx=2
-mop/=(2.0);
-GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + 5 * DEVPARAMS::Volume, gfoffset1);
+int set1_lx[9]={1,1,2,2,1,3,2,3,3};
+int set1_ly[9]={1,2,1,2,3,1,3,2,3};
+int n=sizeof(set1_lx)/sizeof(int);
+for(uint i=0;i< n;i++){
+	index++;
+	{
+	msun mop=MO1<UseTex, Real, atype>(arg, id, set1_lx[i], set1_ly[i],  muvolume);
+	mop/=(2.0*sqrt(2.0));
+	GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + index * DEVPARAMS::Volume, gfoffset1);
+	}
 }
-/////////////////////////////////////
+}
+//////////////////////////////
+// this part is for set3 MO2
 {
-msun mop=MO1<UseTex, Real, atype>(arg, id, 1, 1,  muvolume);//lx=1, ly=1
-mop/=(2.0*sqrt(2.0));
-GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + 6 * DEVPARAMS::Volume, gfoffset1);
+int set3_l1x[9]={1,1,2,1,1,2,1,3,2};
+int set3_ly[9]= {1,1,1,2,3,1,1,1,2};
+int set3_l2x[9]={1,2,1,1,1,2,3,1,2};
+int n=sizeof(set3_l1x)/sizeof(int);
+for(uint i=0;i<n;i++){
+	index++;
+	{
+	msun mop=MO2<UseTex, Real, atype>(arg, id, set3_l1x[i], set3_ly[i], set3_l2x[i],  muvolume); 
+	mop*=0.25;
+	GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + index* DEVPARAMS::Volume, gfoffset1);
+	}
 }
-//////////////////////////////////////
-{
-msun mop=MO1<UseTex, Real, atype>(arg, id, 1, 2,  muvolume); //lx=1, ly=2
-mop/=(2.0*sqrt(2.0));
-GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + 7 * DEVPARAMS::Volume, gfoffset1);
 }
-//////////////////////////////////////
-{
-msun mop=MO1<UseTex, Real, atype>(arg, id, 2, 1,  muvolume); //lx=2, ly=1
-mop/=(2.0*sqrt(2.0));
-GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + 8 * DEVPARAMS::Volume, gfoffset1);
+/////////////////////////////
 }
-{
-msun mop=MO1<UseTex, Real, atype>(arg, id, 2, 2,  muvolume); //lx=2, ly=2
-mop/=(2.0*sqrt(2.0));
-GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + 9 * DEVPARAMS::Volume, gfoffset1);
-}
-////////////second new //////////////////////////
-{
-msun mop=MO1<UseTex, Real, atype>(arg, id, 1, 3,  muvolume); //lx=1, ly=3
-mop/=(2.0*sqrt(2.0));
-GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + 10 * DEVPARAMS::Volume, gfoffset1);
-}
-{
-msun mop=MO1<UseTex, Real, atype>(arg, id, 3, 1,  muvolume); //lx=3, ly=1
-mop/=(2.0*sqrt(2.0));
-GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + 11* DEVPARAMS::Volume, gfoffset1);
-}
-/////////////MO2 Series /////////////////////////
-{
-msun mop=MO2<UseTex, Real, atype>(arg, id, 1, 2, 1,  muvolume); //lx1=1,lx2=2,  ly=1
-mop*=0.25;
-GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + 12* DEVPARAMS::Volume, gfoffset1);
-}
-{
-msun mop=MO2<UseTex, Real, atype>(arg, id, 2, 1, 1,  muvolume); //lx1=2,lx2=1,  ly=1
-mop*=0.25;
-GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + 13* DEVPARAMS::Volume, gfoffset1);
-}
+//end of block for More Operator
+
 }
 //////////////////////////////////////
 // end of kernal for calculation of //
