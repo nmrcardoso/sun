@@ -177,11 +177,8 @@ inline  __host__   __device__ int Index_4D_Neig_EO(const int id, int oddbit, int
 	x[mu] = (x[mu]+lmu+param_GridG(mu)) % param_GridG(mu);
 	
 	int pos = ((((x[3] * param_GridG(2) + x[2]) * param_GridG(1)) + x[1] ) * param_GridG(0) + x[0]) / 2 ;
-	int oddBitChanged = (abs(lmu))%2;
-	if(oddBitChanged){
-		oddbit = 1 - oddbit;
-	}
-	pos += oddbit  * param_HalfVolumeG();
+	int oddbit1 = (x[0] + x[1] + x[2] +x[3]) & 1;
+	pos += oddbit1  * param_HalfVolumeG();
 	return pos;
 }
 
@@ -199,11 +196,8 @@ inline  __host__   __device__ int Index_4D_Neig_EO(const int id, int oddbit, int
 	x[nu] = (x[nu]+lnu+param_GridG(nu)) % param_GridG(nu);
 
 	int pos = ((((x[3] * param_GridG(2) + x[2]) * param_GridG(1)) + x[1] ) * param_GridG(0) + x[0]) / 2 ;
-	int oddBitChanged = (abs(lmu+lnu))%2;
-	if(oddBitChanged){
-		oddbit = 1 - oddbit;
-	}
-	pos += oddbit  * param_HalfVolumeG();
+	int oddbit1 = (x[0] + x[1] + x[2] +x[3]) & 1;
+	pos += oddbit1  * param_HalfVolumeG();
 	return pos;
 }
 
@@ -225,11 +219,8 @@ inline  __host__   __device__ int Index_4D_Neig_EO(const int y[], int oddbit, in
 	#endif
 	x[mu] = (x[mu]+lmu+param_GridG(mu)) % param_GridG(mu);
 	int pos = ((((x[3] * param_GridG(2) + x[2]) * param_GridG(1)) + x[1] ) * param_GridG(0) + x[0]) / 2 ;
-	int oddBitChanged = (abs(lmu))%2;
-	if(oddBitChanged){
-		oddbit = 1 - oddbit;
-	}
-	pos += oddbit  * param_HalfVolumeG();
+	int oddbit1 = (x[0] + x[1] + x[2] +x[3]) & 1;
+	pos += oddbit1  * param_HalfVolumeG();
 	return pos;
 }
 
@@ -247,11 +238,8 @@ inline  __host__   __device__ int Index_4D_Neig_EO(const int y[], int oddbit, in
 	x[mu] = (x[mu]+lmu+param_GridG(mu)) % param_GridG(mu);
 	x[nu] = (x[nu]+lnu+param_GridG(nu)) % param_GridG(nu);
 	int pos = ((((x[3] * param_GridG(2) + x[2]) * param_GridG(1)) + x[1] ) * param_GridG(0) + x[0]) / 2 ;
-	int oddBitChanged = (abs(lmu))%2;
-	if(oddBitChanged){
-		oddbit = 1 - oddbit;
-	}
-	pos += oddbit  * param_HalfVolumeG();
+	int oddbit1 = (x[0] + x[1] + x[2] +x[3]) & 1;
+	pos += oddbit1  * param_HalfVolumeG();
 	return pos;
 }
 
