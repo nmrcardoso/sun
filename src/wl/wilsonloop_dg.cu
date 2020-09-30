@@ -15,7 +15,7 @@
 #include <index.h>
 #include <device_PHB_OVR.h>
 #include <reunitlink.h>
-#include <staple.h>
+
 #include <comm_mpi.h>
 #include <exchange.h>
 #include <texture_host.h>

@@ -15,6 +15,15 @@ void CWilsonLoop(gauge array, complex *res, int radius, int Tmax);
 
 template<class Real>
 void WilsonLoop(gauge array, complex *res, int radius, int Tmax);
+
+
+
+
+template<class Real>
+void CWilsonLoopSS(gauge array, complex *res, int radius, int Tmax);
+
+template<class Real>
+void WilsonLoopSS(gauge array, complex *res, int radius, int Tmax);
 }
 
 #endif

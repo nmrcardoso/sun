@@ -15,7 +15,7 @@
 #include <index.h>
 #include <device_PHB_OVR.h>
 #include <reunitlink.h>
-#include <staple.h>
+
 #include <comm_mpi.h>
 #include <exchange.h>
 #include <texture_host.h>
@@ -96,9 +96,9 @@ __global__ void kernel_WilsonLoop_A0(WLArgA0<Real> arg){
         int idOp = 0;
           for(int iop = 0; iop < arg.opN; iop++)
           for(int jop = 0; jop < arg.opN; jop++){
-            msun linkb = msun::zero();
-            if(id < DEVPARAMS::Volume) linkb = GAUGE_LOAD<false, atype, Real>( arg.fieldOp, id + iop * DEVPARAMS::Volume, gfoffset); //bottom space links
-            Real w = 0.0;
+		        msun linkb = msun::zero();
+		        if(id < DEVPARAMS::Volume) linkb = GAUGE_LOAD<false, atype, Real>( arg.fieldOp, id + iop * DEVPARAMS::Volume, gfoffset); //bottom space links
+		        Real w = 0.0;
 		        if(id < DEVPARAMS::Volume){
 			        msun linkt = GAUGE_LOAD_DAGGER<false, atype, Real>( arg.fieldOp, idl + idt + jop * DEVPARAMS::Volume, gfoffset); //top space links
 			        w = (linkb * t1 * linkt * t0.dagger()).realtrace();
@@ -139,8 +139,6 @@ private:
 	TuneParam tp;
 	Real *wloop_tmp;
     size_t wloop_mem;
-	Real *field_tmp;
-    size_t field_mem;
 
    unsigned int sharedBytesPerThread() const { return 0; }
    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }

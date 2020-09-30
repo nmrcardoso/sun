@@ -29,7 +29,7 @@ namespace CULQCD{
 
 
 template<class Real>
-struct APEArg{
+struct APE2Arg{
   complex *arrayin;
   complex *arrayout;
   Real w;
@@ -41,7 +41,7 @@ struct APEArg{
 
 
 template <bool UseTex, ArrayType atype, class Real>
-__global__ void kernel_APE_Space(APEArg<Real> arg, int mu){  
+__global__ void kernel_APE2_Space(APE2Arg<Real> arg, int mu){  
         
 	int id = INDEX1D();
   if(id >= DEVPARAMS::Volume) return;
@@ -54,30 +54,37 @@ __global__ void kernel_APE_Space(APEArg<Real> arg, int mu){
   
 	//for(int mu = 0; mu < 3; mu++){
     int muvolume = mu * mustride;
-	  msun link;
-	  msun staple = msu3::zero();
-	  for(int nu = 0; nu < 3; nu++)  if(mu != nu) {
-      int dx[4] = {0, 0, 0, 0};	
-		  int nuvolume = nu * mustride;
-		  link = GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin,  id + nuvolume, offset);
-		  dx[nu]++;
-		  link *= GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin, Index_4D_Neig_NM(x,dx) + muvolume, offset);	
-		  dx[nu]--;
-		  dx[mu]++;
-		  link *= GAUGE_LOAD_DAGGER<UseTex, atype, Real>( arg.arrayin, Index_4D_Neig_NM(x,dx) + nuvolume, offset);
-		  staple += link;
-
-		  dx[mu]--;
-		  dx[nu]--;
-		  link = GAUGE_LOAD_DAGGER<UseTex, atype, Real>( arg.arrayin,  Index_4D_Neig_NM(x,dx) + nuvolume, offset);	
-		  link *= GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin, Index_4D_Neig_NM(x,dx)  + muvolume, offset);
-		  dx[mu]++;
-		  link *= GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin, Index_4D_Neig_NM(x,dx) + nuvolume, offset);
-		  staple += link;
-	  }
-	  msun U = GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin,  id + muvolume, offset);
-    link = U + staple * arg.w;
-	link /= ( 1.0 + 6.0 * arg.w );
+	msun link, link1;
+	msun staple = msu3::zero();
+	msun staple1 = msu3::zero();
+	int newidmu1 = Index_4D_Neig_NM(id, mu, 1);
+	for(int nu = 0; nu < 3; nu++)  if(mu != nu) {
+		int nuvolume = nu * mustride;
+		//UP	
+		link = GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin,  id + nuvolume, offset);
+		link *= GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin, Index_4D_Neig_NM(id, nu, 1) + muvolume, offset);
+		link1 = link;	
+		link *= GAUGE_LOAD_DAGGER<UseTex, atype, Real>( arg.arrayin, newidmu1 + nuvolume, offset);
+		
+		link1 *= GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin, Index_4D_Neig_NM(id, nu, 1, mu, 1) + muvolume, offset);	
+		link1 *= GAUGE_LOAD_DAGGER<UseTex, atype, Real>( arg.arrayin, Index_4D_Neig_NM(id, mu, 2) + nuvolume, offset);
+		staple += link;
+		staple1 += link1;
+		//DOWN	
+		int newidnum1 = Index_4D_Neig_NM(id, nu, -1);
+		link = GAUGE_LOAD_DAGGER<UseTex, atype, Real>( arg.arrayin,  newidnum1 + nuvolume, offset);	
+		link *= GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin, newidnum1  + muvolume, offset);
+		link1 = link;
+		link *= GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin, Index_4D_Neig_NM(id, mu, 1, nu,  -1) + nuvolume, offset);
+		link1 *= GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin, Index_4D_Neig_NM(id, nu, -1, mu, 1)  + muvolume, offset);
+		link1 *= GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin, Index_4D_Neig_NM(id, mu, 1, nu,  -1) + nuvolume, offset);
+		staple += link;
+		staple1 += link1;
+	}
+	msun U = GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin,  id + muvolume, offset);
+	//U *= GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin,  Index_4D_Neig_NM(id, mu, 1) + muvolume, offset);
+	link = U + staple * arg.w + staple1 * 0.5;
+	//link /= ( 1.0 + 6.0 * arg.w );
 if(0){
      /* Start with a unitarized version */
     U = link;
@@ -106,11 +113,11 @@ if(1){
 
 
 template <bool UseTex, ArrayType atypein, class Real> 
-class ApplyAPE: Tunable{
+class ApplyAPE2: Tunable{
 private:
    gauge arrayin;
    gauge arrayout;
-   APEArg<Real> arg;
+   APE2Arg<Real> arg;
    int size;
    double timesec;
    int mu;
@@ -124,10 +131,10 @@ private:
    unsigned int minThreads() const { return size; }
    void apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_APE_Space<UseTex, atypein, Real><<<tp.grid,tp.block, 0, stream>>>(arg, mu);
+      kernel_APE2_Space<UseTex, atypein, Real><<<tp.grid,tp.block, 0, stream>>>(arg, mu);
 	}
 public:
-   ApplyAPE(gauge &arrayin, gauge & arrayout, Real w, int nhits, Real tol):arrayin(arrayin),arrayout(arrayout){
+   ApplyAPE2(gauge &arrayin, gauge & arrayout, Real w, int nhits, Real tol):arrayin(arrayin),arrayout(arrayout){
 		size = 1;
 		//Number of threads is equal to the number of space points!
 		for(int i=0;i<4;i++){
@@ -142,12 +149,12 @@ public:
 	  arg.w = w;
 	  mu = 0;
 	}
-  ~ApplyAPE(){};
+  ~ApplyAPE2(){};
   
   void SetDir(int muin){ mu = muin;};
 
 	double time(){return timesec;}
-	void stat(){ COUT << "ApplyAPE:  " <<  time() << " s\t"  << bandwidth() << " GB/s\t" << flops() << " GFlops"  << endl;}
+	void stat(){ COUT << "ApplyAPE2:  " <<  time() << " s\t"  << bandwidth() << " GB/s\t" << flops() << " GFlops"  << endl;}
 	long long flop() const { return 0;}
 	long long bytes() const { return 0;}
 	double flops(){	return ((double)flop() * 1.0e-9) / timesec;}
@@ -189,8 +196,8 @@ public:
 
 
 template<class Real>
-void ApplyAPEinSpace(gauge array, Real w, int steps, int nhits, Real tol){
-  cout << "Apply APE Smearing in Space with w = " << w << " steps = " << steps << " nhit = " << nhits << " tol = " << tol << endl;
+void ApplyAPE2inSpace(gauge array, Real w, int steps, int nhits, Real tol){
+  cout << "Apply APE2 Smearing in Space with w = " << w << " steps = " << steps << " nhit = " << nhits << " tol = " << tol << endl;
   if(array.Type() != SOA)
     errorCULQCD("Only defined for SOA arrays...\n");
   if(array.EvenOdd() == true)
@@ -201,31 +208,31 @@ void ApplyAPEinSpace(gauge array, Real w, int steps, int nhits, Real tol){
   const ArrayType atypein = SOA;
   if(PARAMS::UseTex){
 	  GAUGE_TEXTURE(array.GetPtr(), true);
-    ApplyAPE<true, atypein, Real> ape(array, arrayout, w, nhits, tol);
+    ApplyAPE2<true, atypein, Real> APE2(array, arrayout, w, nhits, tol);
     for(int st = 0; st < steps; st++){
       for(int mu = 0; mu < 3; mu++){
-        ape.SetDir(mu);
-        ape.Run();
+        APE2.SetDir(mu);
+        APE2.Run();
       }
       array.Copy(arrayout);
     }
-    ape.stat();
+    APE2.stat();
   }
   else{
-    ApplyAPE<false, atypein, Real> ape(array, arrayout, w, nhits, tol);
+    ApplyAPE2<false, atypein, Real> APE2(array, arrayout, w, nhits, tol);
     for(int st = 0; st < steps; st++){
       for(int mu = 0; mu < 3; mu++){
-        ape.SetDir(mu);
-        ape.Run();
+        APE2.SetDir(mu);
+        APE2.Run();
       }
       array.Copy(arrayout);
     }
-    ape.stat();
+    APE2.stat();
   }
   arrayout.Release();
 }
-template void ApplyAPEinSpace<float>(gauges array, float w, int steps, int nhits, float tol);
-template void ApplyAPEinSpace<double>(gauged array, double w, int steps, int nhits, double tol);
+template void ApplyAPE2inSpace<float>(gauges array, float w, int steps, int nhits, float tol);
+template void ApplyAPE2inSpace<double>(gauged array, double w, int steps, int nhits, double tol);
 
 
 
@@ -234,8 +241,8 @@ template void ApplyAPEinSpace<double>(gauged array, double w, int steps, int nhi
 
 
 template<class Real>
-void ApplyAPEinTime(gauge array, Real w, int steps, int nhits, Real tol){
-  cout << "Apply APE Smearing in Time with w = " << w << " steps = " << steps << " nhit = " << nhits << " tol = " << tol << endl;
+void ApplyAPE2inTime(gauge array, Real w, int steps, int nhits, Real tol){
+  cout << "Apply APE2 Smearing in Time with w = " << w << " steps = " << steps << " nhit = " << nhits << " tol = " << tol << endl;
   if(array.Type() != SOA)
     errorCULQCD("Only defined for SOA arrays...\n");
   if(array.EvenOdd() == true)
@@ -246,27 +253,27 @@ void ApplyAPEinTime(gauge array, Real w, int steps, int nhits, Real tol){
   const ArrayType atypein = SOA;
   if(PARAMS::UseTex){
 	  GAUGE_TEXTURE(array.GetPtr(), true);
-    ApplyAPE<true, atypein, Real> ape(array, arrayout, w, nhits, tol);
-    ape.SetDir(3);
+    ApplyAPE2<true, atypein, Real> APE2(array, arrayout, w, nhits, tol);
+    APE2.SetDir(3);
     for(int st = 0; st < steps; st++){
-      ape.Run();
+      APE2.Run();
       array.Copy(arrayout);
     }
-    ape.stat();
+    APE2.stat();
   }
   else{
-    ApplyAPE<false, atypein, Real> ape(array, arrayout, w, nhits, tol);
-    ape.SetDir(3);
+    ApplyAPE2<false, atypein, Real> APE2(array, arrayout, w, nhits, tol);
+    APE2.SetDir(3);
     for(int st = 0; st < steps; st++){
-      ape.Run();
+      APE2.Run();
       array.Copy(arrayout);
     }
-    ape.stat();
+    APE2.stat();
   }
   arrayout.Release();
 }
-template void ApplyAPEinTime<float>(gauges array, float w, int steps, int nhits, float tol);
-template void ApplyAPEinTime<double>(gauged array, double w, int steps, int nhits, double tol);
+template void ApplyAPE2inTime<float>(gauges array, float w, int steps, int nhits, float tol);
+template void ApplyAPE2inTime<double>(gauged array, double w, int steps, int nhits, double tol);
 
 
 

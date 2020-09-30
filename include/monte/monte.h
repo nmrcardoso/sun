@@ -14,12 +14,13 @@ namespace CULQCD{
 
 
 
-template <class Real> 
+template <class Real, int actiontype> 
 class HeatBath: Tunable{
 private:
-   typedef void (*TFuncPtr)(complex*, cuRNGState *, int, int);
+   typedef void (*TFuncPtr)(complex*, complex*, cuRNGState *, int, int);
    TFuncPtr kernel_pointer;
    gauge array;
+   gauge *staple;
    RNG randstates;
    int size;
    double timesec;
@@ -40,7 +41,7 @@ private:
 
 public:
    HeatBath(gauge &array, RNG &randstates);
-   ~HeatBath(){};
+   ~HeatBath();
 
 
    void Run(const cudaStream_t &stream);

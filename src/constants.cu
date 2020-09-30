@@ -23,6 +23,11 @@ namespace PARAMS{
     /*! \brief If true uses texture memory instead of global memory */
     bool	UseTex = false;
     double	Beta = 6.2;
+    double  Aniso = 1.0;
+    
+    double IMP_Us;
+    double IMP_Ut;
+    
     /*! \brief Size = Nx x Ny */
     int	 	kstride = 0;
     /*! \brief Size = Nx x Ny x Nz */
@@ -146,13 +151,14 @@ void PrintDetails(){
 }
 
 
-void SETPARAMS(bool _usetex, double beta, int nx, int ny, int nz, int nt, bool verbose){
+void SETPARAMS(bool _usetex, double beta, int nx, int ny, int nz, int nt, bool verbose, double aniso){
 	/*static bool setparams = false;
 	if(setparams){
 		COUT << "Local parameters already set... Nothing to do here..." << std::endl;
 		return;
 	}*/
 	PARAMS::Beta = beta;
+	PARAMS::Aniso = aniso;
 
 	COUT << "Setting up lattice parameters..." << std::endl;
 	// Set Host parameters
@@ -427,6 +433,11 @@ namespace DEVPARAMS{
     /*! \brief HYP smearing constant: alpha3 */
     __constant__	float	hypalpha3;
 
+
+    __constant__	double	Aniso;
+    __constant__	double	IMP_Us;
+    __constant__	double	IMP_Ut;
+    
 }
 
 /*! \brief Setups the texture memory reading, if TexOn is false then uses global memory */
@@ -452,6 +463,7 @@ void copyConstantsToGPU(){
 	memcpyToSymbol( DEVPARAMS::HalfVolume, &PARAMS::HalfVolume, int);
 	memcpyToSymbol( DEVPARAMS::VolumeG, &PARAMS::VolumeG, int);
 	memcpyToSymbol( DEVPARAMS::HalfVolumeG, &PARAMS::HalfVolumeG, int);
+	memcpyToSymbol( DEVPARAMS::Aniso, &PARAMS::Aniso, double);
 }
 
 
@@ -461,6 +473,14 @@ void copyHYPSmearConstants(float _alpha1, float _alpha2, float _alpha3){
   memcpyToSymbol(DEVPARAMS::hypalpha1, &_alpha1, float);
   memcpyToSymbol(DEVPARAMS::hypalpha2, &_alpha2, float);
   memcpyToSymbol(DEVPARAMS::hypalpha3, &_alpha3, float);
+}
+
+
+void SetUsUt(double us, double ut){
+	PARAMS::IMP_Us = us;
+	PARAMS::IMP_Ut = ut;
+	memcpyToSymbol( DEVPARAMS::IMP_Us, &PARAMS::IMP_Us, double);
+	memcpyToSymbol( DEVPARAMS::IMP_Ut, &PARAMS::IMP_Ut, double);
 }
 
 }

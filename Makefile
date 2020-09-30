@@ -35,7 +35,7 @@ endif
 #SET CUDA PATH
 CUDA_PATH ?= /usr/local/cuda
 #SET DEVICE ARQUITECTURE -> NO SUPPORT for SM 1.X!!!!!
-GPU_ARCH = sm_75
+GPU_ARCH = sm_52
 GENCODE_FLAGS = -arch=$(GPU_ARCH)
 #GENCODE_FLAGS = -arch=$(GPU_ARCH) --ptxas-options=-v
 ############################################################################################################
@@ -256,15 +256,15 @@ GAUGEFIX_OBJS :=  gauge_fix/gaugefix_fft.o gauge_fix/gaugefix_fft_stdorder.o gau
 
 
 
-MONTE_OBJS := monte/monte.o monte/ovr.o
+MONTE_OBJS := monte/monte.o monte/ovr.o monte/staple.o
 
 MEAS_OBJS :=  meas/linkdetsum.o  meas/linktrsum.o meas/plaquette.o meas/plaquette_cub.o \
 		meas/pl.o  meas/plr.o meas/plr3d.o meas/polyakovloop.o meas/linkUF.o meas/wilsonloop.o \
-        meas/plaquettefield.o meas/plfield.o meas/chromofield.o
+         meas/wilsonloopSS.o meas/plaquettefield.o meas/plfield.o meas/chromofield.o
 
 
 
-SMEAR_OBJS := smear/ape.o smear/hyp.o smear/multihitsp.o  smear/multihit.o smear/stout.o smear/multihitext.o
+SMEAR_OBJS := smear/ape.o smear/ape2.o smear/hyp.o smear/multihitsp.o  smear/multihit.o smear/stout.o smear/multihitext.o
 
 WL_OBJS := wl/calcop_dg_A0.o wl/wilsonloop_dg_A0.o wl/calcop_dg_33.o wl/wilsonloop_dg.o
 
@@ -310,7 +310,7 @@ $(OBJDIR)/dlink.o: $(CUDAOBJS)
 ############################################################################################################
 $(LIBDIR)/$(LIBNAME):  directories $(CUDAOBJ) 
 	@echo ""######################### Creating: "$(LIBDIR)/$(LIBNAME)" #########################"
-	$(VERBOSE)rm -f  $(LIBDIR)/$(LIBNAME)
+#	$(VERBOSE)rm -f  $(LIBDIR)/$(LIBNAME)
 	ar rcs $(LIBDIR)/$(LIBNAME)  $(CUDAOBJ)
 	ranlib $(LIBDIR)/$(LIBNAME)
 ############################################################################################################

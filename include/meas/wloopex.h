@@ -23,20 +23,8 @@ class Sigma_g_plus{
 		size_t wloop_size;
 		//Store all space line components
 		gauge fieldOp;
-	Sigma_g_plus(const int _Rmax, const int _Tmax) : Rmax(_Rmax), Tmax(_Tmax){
-		opN = 10;
-		totalOpN = opN * opN;
-		fieldOp.Set( SOA, Device, false);
-		fieldOp.Allocate(PARAMS::Volume * opN);
-		wloop_size = totalOpN * (Tmax+1) * sizeof(Real);
-		wloop = (Real*) dev_malloc( wloop_size );
-		wloop_h = (Real*) safe_malloc( wloop_size );
-	}
-	~Sigma_g_plus(){
-		dev_free(wloop);
-		host_free(wloop_h);
-		fieldOp.Release();
-	}
+	Sigma_g_plus(const int _Rmax, const int _Tmax);
+	~Sigma_g_plus();
 };
 // Calculate the 4 types of space Wilson lines for a give radius and direction mu
 template<class Real>
