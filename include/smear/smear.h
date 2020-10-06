@@ -10,13 +10,17 @@ namespace CULQCD{
 
 ////////////////////////////   APE SMEARING //////////////////////////////
 template<class Real>
-void ApplyAPEinSpace(gauge array, Real w, int steps, int nhits, Real tol);
+void ApplyAPEinSpace(gauge array, Real w, int steps, int nhits=10, Real tol=1.e-10);
 
 template<class Real>
-void ApplyAPEinTime(gauge array, Real w, int steps, int nhits, Real tol);
+void ApplyAPEinTime(gauge array, Real w, int steps, int nhits=10, Real tol=1.e-10);
 
 
+template<class Real>
+void ApplyAPE2inTime(gauge array, Real w, int steps, int nhits=10, Real tol=1.e-10);
 
+template<class Real>
+void ApplyAPE2inSpace(gauge array, Real w, int steps, int nhits=10, Real tol=1.e-10);
 
 ////////////////////////////   HYP SMEARING //////////////////////////////
 class ParamHYP{
@@ -58,6 +62,8 @@ void ApplyStoutinTime(gauge array, Real w, int steps);
 ////////////////////////////   MULTIHIT SMEARING //////////////////////////////
 template<class Real>
 void ApplyMultiHit(gauge array, gauge arrayout, RNG &randstates, int nhit);
+template<class Real>
+void ApplyMultiHit(gauge array, gauge arrayout, RNG &randstates, int nhit, int actiontype);
 
 template<class Real>
 void ApplyMultiHitSpace(gauge array, gauge arrayout, RNG &randstates, int nhit);

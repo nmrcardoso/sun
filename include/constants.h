@@ -108,6 +108,11 @@ namespace PARAMS{
     extern dim3 nblocksINITHALF;
     extern dim3 nthreadsREU;
     extern dim3 nblocksREU;
+    
+    
+    extern double Aniso;
+    extern double IMP_Us;
+    extern double IMP_Ut;
 }
 
 
@@ -125,7 +130,7 @@ void PrintDetails();
 /**
     @brief Set the global lattice parameters. This function also copies these global parameters to GPU constant memory, void copyConstantsToGPU();
 */
-void SETPARAMS(bool _usetex, double beta, int nx, int ny, int nz, int nt, bool verbose);
+void SETPARAMS(bool _usetex, double beta, int nx, int ny, int nz, int nt, bool verbose, double aniso=1.);
 
 
 
@@ -133,6 +138,8 @@ void SETPARAMS(bool _usetex, int latticedim[4], const int nodesperdim[4], \
     const int logical_coordinate[4], bool verbose);
 
 
+
+void SetUsUt(double us, double ut);
 
 
 /**
@@ -226,6 +233,12 @@ extern __constant__	float	hypalpha1;
 extern __constant__	float	hypalpha2;
 /*! \brief HYP smearing constant: alpha3 */
 extern __constant__	float	hypalpha3;
+
+
+    extern __constant__	double	Aniso;
+    extern __constant__	double	IMP_Us;
+    extern __constant__	double	IMP_Ut;
+    
 }
 
 
@@ -249,6 +262,13 @@ double __host__ __device__ inline  param_Beta(){
     return DEVPARAMS::Beta;
     #else
     return PARAMS::Beta;
+    #endif
+}
+double __host__ __device__ inline  param_Aniso(){
+    #ifdef __CUDA_ARCH__
+    return DEVPARAMS::Aniso;
+    #else
+    return PARAMS::Aniso;
     #endif
 }
 int __host__ __device__ inline  param_Volume(){

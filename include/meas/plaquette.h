@@ -54,14 +54,12 @@ private:
    void SetFunctionPtr();
 
 public:
-   Plaquette(gauge &array, complex *sum);
+   Plaquette(gauge &array);
    Plaquette(){};
-   ~Plaquette(){};
+   ~Plaquette();
 
-   void Run(const cudaStream_t &stream, bool calcmeanvalue);
-   void Run(bool calcmeanvalue);
-   complex Reduce(const cudaStream_t &stream);
-   complex Reduce();
+   complex Run(const cudaStream_t &stream);
+   complex Run();
    double flops();
    double bandwidth();
    long long flop() const ;

@@ -62,11 +62,11 @@ void FinalRUN(int argc, char** argv){
 	PARAMS::UseTex = usetex;
 	
 	//initCULQCD(gpuid, DEBUG_VERBOSE, TUNE_YES);
-	initCULQCD(gpuid, VERBOSE, TUNE_YES);
+	initCULQCD(gpuid, DEBUG_VERBOSE, TUNE_YES);
 
 	int verbosemonte = 10;	
-	int termalizationiterterm = 40;//990;//50;
-	int stepstomeasures = 10;
+	int termalizationiterterm = 450;//990;//50;
+	int stepstomeasures = 50;
 	
 	//initCULQCD(gpuid, VERBOSE, TUNE_YES);
 	//if TUNE_YES user must set export CULQCD_RESOURCE_PATH="path to folder where the tuning parameters are saved..."
@@ -103,20 +103,43 @@ void FinalRUN(int argc, char** argv){
 	AA.Init(randstates); 
 	
 	
+/*	Lattice Monte Carlo Step... 10
+:::::0.819262::::1
+Plaquette: < 4.506879746914e-01 : 8.029695749283e-01 > :: mean: 6.268287897110e-01
+Polyakov Loop: < 2.124324906617e-03 : -3.250153968111e-03 : 3.882815595716e-03 >
+HeatBath:  0.401647 s	12.9982 GB/s	44.4475 GFlops
+OverRelaxation:  0.386388 s	12.2832 GB/s	46.7798 GFlops
+
 	
+:::::0.819236::::1
+Plaquette: < 4.510477185249e-01 : 8.029575943947e-01 > :: mean: 6.270026564598e-01
+Polyakov Loop: < -8.430885500275e-04 : -1.698338543065e-03 : 1.896088593639e-03 >
+HeatBath:  0.40277 s	12.962 GB/s	44.3236 GFlops
+OverRelaxation:  0.387157 s	12.2588 GB/s	46.6869 GFlops
+Reunitarize:  0.002165 s	219.219 GB/s	411.923 GFlops
+Plaquette:  0.006647 s	199.331 GB/s	646.881 GFlops
+Polyakov Loop:  0.000302 s	196.785 GB/s	870.271 GFlops
+Lattice Monte Carlo Step... 20
+:::::0.81941::::1
+Plaquette: < 4.506992399693e-01 : 8.029869794846e-01 > :: mean: 6.268430948257e-01
+Polyakov Loop: < -8.479307871312e-05 : -7.071811705828e-04 : 7.122464594431e-04 >
+HeatBath:  0.407151 s	12.8225 GB/s	43.8466 GFlops
+OverRelaxation:  0.391658 s	12.118 GB/s	46.1504 GFlops
+Reunitarize:  0.002182 s	217.511 GB/s	408.714 GFlops
+*/
 	
-	
-	PlaquetteCUB<Real> plaqCUB(AA);
+	PlaquetteCUB<Real> plaq(AA);
+	//Plaquette<Real> plaq(AA);
 	OnePolyakovLoop<Real> poly(AA);
 	HeatBath<Real, actiontype> heat(AA, randstates);
 	OverRelaxation<Real, actiontype> over(AA);
 	Reunitarize<Real> reu(AA);
-	reu.Run();        
-	complex plaq_value = plaqCUB.Run();
+	//reu.Run();        
+	complex plaq_value = plaq.Run();
 	poly.Run();
-	plaqCUB.printValue();
+	plaq.printValue();
 	poly.printValue();
-	plaqCUB.stat();
+	plaq.stat();
 	poly.stat();
 	//Thermatization!!!!!!!!!!!!!!!!!!!!	
 	for(int step = 1; step <= termalizationiterterm; step++){
@@ -134,15 +157,15 @@ void FinalRUN(int argc, char** argv){
 		for(int i = 0; i< nmonte; i++) heat.Run();
 		for(int i = 0; i< nover; i++)  over.Run();
 		reu.Run();
-		plaq_value = plaqCUB.Run();
+		plaq_value = plaq.Run();
 		poly.Run();
 		if(step%verbosemonte == 0 || step == termalizationiterterm) {
-			plaqCUB.printValue();
+			plaq.printValue();
 			poly.printValue();
 			heat.stat();
 			over.stat();
 			reu.stat();
-			plaqCUB.stat();
+			plaq.stat();
 			poly.stat();
 		}
 	}
@@ -162,15 +185,15 @@ void FinalRUN(int argc, char** argv){
 		for(int i = 0; i< nmonte; i++) heat.Run();
 		for(int i = 0; i< nover; i++)  over.Run();
 		reu.Run();
-		plaq_value = plaqCUB.Run();
+		plaq_value = plaq.Run();
 		poly.Run();
 		if(step%verbosemonte == 0 || step == maxsteps) {
-			plaqCUB.printValue();
+			plaq.printValue();
 			poly.printValue();
 			heat.stat();
 			over.stat();
 			reu.stat();
-			plaqCUB.stat();
+			plaq.stat();
 			poly.stat();
 		}
 		if(step%stepstomeasures == 0){
@@ -249,9 +272,9 @@ void FinalRUN(int argc, char** argv){
 
 
 					ofstream fileout; 
-					string filename1 = "WilsonLoop_A2_";
-					if(meas==1) filename1 = "WilsonLoop_APE_A2_";
-					if(meas==2) filename1 = "WilsonLoop_APE_MHIT_A2_";
+					string filename1 = "WilsonLoop_A2_" + meastype + "_";
+					/*if(meas==1) filename1 = "WilsonLoop_APE_A2_";
+					if(meas==2) filename1 = "WilsonLoop_APE_MHIT_A2_";*/
 					 filename1 += filename;
 					
 
@@ -453,7 +476,7 @@ void RestartRUN(int argc, char** argv){
   	ReadBin_Gauge<Real, double>(AA, filenamein, true);
 
 	
-	PlaquetteCUB<Real> plaqCUB(AA);
+	PlaquetteCUB<Real> plaq(AA);
 	OnePolyakovLoop<Real> poly(AA);
 	HeatBath<Real, 0> heat(AA, randstates);
 	OverRelaxation<Real, 0> over(AA);
@@ -461,13 +484,13 @@ void RestartRUN(int argc, char** argv){
 	//reu.Run();   
     
 	//Calculate plaquette
-	plaqCUB.Run();
-	plaqCUB.printValue();
+	plaq.Run();
+	plaq.printValue();
 	//Calculate polyakov loop
 	poly.Run();
 	poly.printValue();
     //.stat() for performance printing
-	plaqCUB.stat();
+	plaq.stat();
 	poly.stat();
 	
 	//////////////////////////////////////////////////////////////////////////////////////////////
@@ -476,15 +499,15 @@ void RestartRUN(int argc, char** argv){
 		for(int i = 0; i< nmonte; i++) heat.Run();
 		for(int i = 0; i< nover; i++)  over.Run();
 		reu.Run();
-		plaqCUB.Run();
+		plaq.Run();
 		poly.Run();
 		if(step%verbosemonte == 0 || step == maxsteps) {
-			plaqCUB.printValue();
+			plaq.printValue();
 			poly.printValue();
 			heat.stat();
 			over.stat();
 			reu.stat();
-			plaqCUB.stat();
+			plaq.stat();
 			poly.stat();
 		}
 		if(step%stepstomeasures == 0){

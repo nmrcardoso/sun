@@ -41,7 +41,7 @@ namespace CULQCD{
 
 template<class Real>
 Sigma_g_plus<Real>::Sigma_g_plus(const int _Rmax, const int _Tmax) : Rmax(_Rmax), Tmax(_Tmax){
-	opN = 15;//9;//15;
+	opN = 21;//9;//15;
 	totalOpN = opN * opN;
 	fieldOp.Set( SOA, Device, false);
 	fieldOp.Allocate(PARAMS::Volume * opN);
@@ -312,7 +312,7 @@ __global__ void kernel_CalcOPsF_A0_33(WLOPArg<Real> arg){
 	else GAUGE_SAVE<SOA, Real>( arg.fieldOp, link, id, gfoffset1);
 	pos++;
 	
-	for(int kk=1; kk<=14; ++kk){
+	for(int kk=1; kk<=20; ++kk){
 		msun mop=MO0<UseTex, Real, atype>(arg, id, kk,  muvolume); 
 		mop/=(2.0);
 		GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + pos * DEVPARAMS::Volume, gfoffset1);
