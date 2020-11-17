@@ -185,7 +185,7 @@ DEVICE msun MO2D0(WLOPArg<Real> arg,int id, int lx, int ly, int muvolume){
 		}
 		//downway
 		for(int ix=0;ix<lx;ix++){
-			ids[il]=Index_4D_Neig_NM(ids[il], dmu1[il], -1);//notice: it is iy, and ids[0]
+			ids[il]=Index_4D_Neig_NM(ids[il], dmu[il], -1);
 			link0*=GAUGE_LOAD_DAGGER<UseTex, atype, Real>( arg.gaugefield, ids[il]+dmu[il]*DEVPARAMS::Volume, DEVPARAMS::size);
 		}
 		mop+=link0;
