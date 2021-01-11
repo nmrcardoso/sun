@@ -454,7 +454,8 @@ if(numnodes()>1){
 
     if(mynode() == masternode()  && withheader) {
         fileout.write((const char*)(&PARAMS::Grid), sizeof(int)*4);
-        fileout.write((const char*)(&PARAMS::Beta), sizeof(Real));
+        RealSaveConf beta = RealSaveConf(PARAMS::Beta);
+        fileout.write((const char*)(&beta), sizeof(RealSaveConf));
         size_t confprec = sizeof(RealSaveConf);
         fileout.write((const char*)(&confprec), sizeof(size_t));
     }
@@ -534,7 +535,8 @@ return;
         
         if(withheader){
             fileout.write((const char*)(&PARAMS::Grid), sizeof(int)*4);
-            fileout.write((const char*)(&PARAMS::Beta), sizeof(Real));
+            RealSaveConf beta = RealSaveConf(PARAMS::Beta);
+            fileout.write((const char*)(&beta), sizeof(RealSaveConf));
             size_t confprec = sizeof(RealSaveConf);
             fileout.write((const char*)(&confprec), sizeof(size_t));
         }
@@ -630,7 +632,9 @@ if(numnodes()>1){
         filein.read((char*)(&gridDim), sizeof(int)*4);
         for(int dim = 0; dim < 4; dim++) COUT << "dim " << dim << " : " << gridDim[dim] << endl;
         Real beta = 0.0;
-        filein.read((char*)(&beta), sizeof(Real));
+        RealSaveConf beta0;
+        filein.read((char*)(&beta0), sizeof(RealSaveConf));
+        beta = Real(beta0);
         COUT << "beta: " << beta << endl;
         size_t confprec;
         filein.read((char*)(&confprec), sizeof(size_t));
@@ -729,7 +733,9 @@ return;
             filein.read((char*)(&gridDim), sizeof(int)*4);
             for(int dim = 0; dim < 4; dim++) COUT << "dim " << dim << " : " << gridDim[dim] << endl;
             Real beta = 0.0;
-            filein.read((char*)(&beta), sizeof(Real));
+            RealSaveConf beta0;
+            filein.read((char*)(&beta0), sizeof(RealSaveConf));
+            beta = Real(beta0);
             COUT << "beta: " << beta << endl;
             size_t confprec;
             filein.read((char*)(&confprec), sizeof(size_t));
