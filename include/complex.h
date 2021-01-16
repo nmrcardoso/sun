@@ -117,7 +117,7 @@ class _complex {
     return result;
   }
     friend M_HOSTDEVICE _complex<Real> operator-(const Real REF(a), const _complex<Real>& z){
-      return _complex(a - z.val.x, z.val.y);
+      return _complex(a - z.val.x,-z.val.y);
     }
   // negate a complex number
   M_HOSTDEVICE _complex<Real> operator-() const {
