@@ -43,6 +43,17 @@ namespace CULQCD {
      @return peak host memory allocated
    */
   long host_allocated_peak();
+  
+  /**
+     @return are we using managed memory for device allocations
+  */
+  bool use_managed_memory();
+
+
+  /**
+     @return is prefetching support enabled (assumes managed memory is enabled)
+  */
+  bool is_prefetch_enabled();
 
   /*
    * The following functions should not be called directly.  Use the
@@ -56,6 +67,8 @@ namespace CULQCD {
   void dev_free_(const char *func, const char *file, int line, void *ptr);
   void dev_pinned_free_(const char *func, const char *file, int line, void *ptr);
   void host_free_(const char *func, const char *file, int line, void *ptr);
+  void *managed_malloc_(const char *func, const char *file, int line, size_t size);
+  void managed_free_(const char *func, const char *file, int line, void *ptr);
 
   // strip path from __FILE__
   inline constexpr const char* str_end(const char *str) { return *str ? str_end(str + 1) : str; }
@@ -75,7 +88,9 @@ namespace CULQCD {
 #define dev_free(ptr) CULQCD::dev_free_(__func__, CULQCD::file_name(__FILE__), __LINE__, ptr)
 #define dev_pinned_free(ptr) CULQCD::dev_pinned_free_(__func__, CULQCD::file_name(__FILE__), __LINE__, ptr)
 #define host_free(ptr) CULQCD::host_free_(__func__, CULQCD::file_name(__FILE__), __LINE__, ptr)
-
+#define managed_malloc(size) CULQCD::managed_malloc_(__func__, CULQCD::file_name(__FILE__), __LINE__, size)
+#define managed_free(ptr) CULQCD::managed_free_(__func__, CULQCD::file_name(__FILE__), __LINE__, ptr)
+#define get_mapped_device_pointer(ptr) CULQCD::get_mapped_device_pointer_(__func__, CULQCD::file_name(__FILE__), __LINE__, ptr)
 
 
 
