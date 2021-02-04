@@ -13,6 +13,7 @@
 #include <cuda_common.h> 
 #include <modes.h>
 #include <comm_mpi.h> 
+#include <cuda_error_check.h> 
 
 
 //CODE FROM QUDA LIBRARY WITH A FEW MODIFICATIONS
@@ -25,6 +26,7 @@ namespace CULQCD {
     HOST_PTR,
     PINNED_PTR,
     MAPPED_PTR,
+    MANAGED_PTR,
     N_ALLOC_TYPE
   };
 
@@ -69,6 +71,8 @@ namespace CULQCD {
   long mapped_allocated_peak() { return max_total_bytes[MAPPED_PTR]; }
 
   long host_allocated_peak() { return max_total_bytes[HOST_PTR]; }
+  
+  long managed_allocated_peak() { return max_total_bytes[MANAGED_PTR]; }
 
   static void print_trace (void) {
     void *array[10];
@@ -90,7 +94,7 @@ namespace CULQCD {
 
   static void print_alloc(AllocType type)
   {
-    const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped"};
+    const char *type_str[] = {"Device", "Device Pinned", "Host", "Pinned", "Mapped", "Managed"};
     std::map<void *, MemAlloc>::iterator entry;
 
     for (entry = alloc[type].begin(); entry != alloc[type].end(); entry++) {
@@ -311,6 +315,118 @@ namespace CULQCD {
   }  
 
 
+
+
+  bool use_managed_memory()
+  {
+    static bool managed = false;
+    static bool init = false;
+
+    if (!init) {
+      char *enable_managed_memory = getenv("CULQCD_ENABLE_MANAGED_MEMORY");
+      if (enable_managed_memory && strcmp(enable_managed_memory, "1") == 0) {
+        printfCULQCD("Warning: Using managed memory for CUDA allocations");
+        managed = true;
+        
+        
+		cudaDeviceProp deviceProp;
+		int dev;
+		cudaSafeCall(cudaGetDevice( &dev));
+		cudaGetDeviceProperties(&deviceProp, dev);
+
+        if (deviceProp.major < 6) printfCULQCD("Warning: Using managed memory on pre-Pascal architecture is limited\n");
+      }
+
+      init = true;
+    }
+
+    return managed;
+  }
+
+  bool is_prefetch_enabled()
+  {
+    static bool prefetch = false;
+    static bool init = false;
+
+    if (!init) {
+      if (use_managed_memory()) {
+        char *enable_managed_prefetch = getenv("CULQCD_ENABLE_MANAGED_PREFETCH");
+        if (enable_managed_prefetch && strcmp(enable_managed_prefetch, "1") == 0) {
+          printfCULQCD("Warning: Enabling prefetch support for managed memory");
+          prefetch = true;
+        }
+      }
+
+      init = true;
+    }
+
+    return prefetch;
+  }
+
+
+
+
+
+
+
+
+
+
+
+  
+  /**
+   * Perform a standard cudaMallocManaged() with error-checking.  This
+   * function should only be called via the managed_malloc() macro
+   */
+  void *managed_malloc_(const char *func, const char *file, int line, size_t size)
+  {
+    MemAlloc a(func, file, line);
+    void *ptr;
+
+    a.size = a.base_size = size;
+
+    cudaError_t err = cudaMallocManaged(&ptr, size);
+    if (err != cudaSuccess) {
+      errorCULQCD("Failed to allocate managed memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+    }
+    track_malloc(MANAGED_PTR, a, ptr);
+#ifdef HOST_DEBUG
+//#ifdef HOST_DEBUG
+    cudaError_t err1 = cudaMemset(ptr, 0, size);
+    if (err1 != cudaSuccess) {
+      printfCULQCD("ERROR: Failed to set managed memory of size %zu (%s:%d in %s())\n", size, file, line, func);
+      errorCULQCD("Aborting\n");
+    }
+#endif
+    return ptr;
+  }
+
+  /**
+   * Free device memory allocated with device_malloc().  This function
+   * should only be called via the device_free() macro, defined in
+   * malloc_quda.h
+   */
+  void managed_free_(const char *func, const char *file, int line, void *ptr)
+  {
+    if (!ptr) { errorCULQCD("Attempt to free NULL managed pointer (%s:%d in %s())\n", file, line, func); }
+    if (!alloc[MANAGED_PTR].count(ptr)) {
+      errorCULQCD("Attempt to free invalid managed pointer (%s:%d in %s())\n", file, line, func);
+    }
+    cudaError_t err = cudaFree(ptr);
+    if (err != cudaSuccess) { errorCULQCD("Failed to free device memory (%s:%d in %s())\n", file, line, func); }
+    track_free(MANAGED_PTR, ptr);
+  }
+
+
+
+
+
+
+
+
+
+
+
   /**
    * Free device memory allocated with dev_malloc().  This function
    * should only be called via the dev_free() macro, defined in
@@ -414,6 +530,7 @@ namespace CULQCD {
   {
   	printfCULQCD("----------------------------------------------------------\n");
     printfCULQCD("Device memory used = %.1f MB\n", max_total_bytes[DEVICE_PTR] / (double)(1<<20));
+    printfCULQCD("Managed memory used = %.1f MB\n", max_total_bytes[MANAGED_PTR] / (double)(1 << 20));
     printfCULQCD("Pinned device memory used = %.1f MB\n", max_total_bytes[DEVICE_PINNED_PTR] / (double)(1<<20));
     printfCULQCD("Page-locked host memory used = %.1f MB\n", max_total_pinned_bytes / (double)(1<<20));
     printfCULQCD("Total host memory used >= %.1f MB\n", max_total_host_bytes / (double)(1<<20));
@@ -423,11 +540,12 @@ namespace CULQCD {
 
   void assertAllMemFree()
   {
-    if (!alloc[DEVICE_PTR].empty() || !alloc[DEVICE_PINNED_PTR].empty() || !alloc[HOST_PTR].empty() || !alloc[PINNED_PTR].empty() || !alloc[MAPPED_PTR].empty()) {
+    if (!alloc[DEVICE_PTR].empty() || !alloc[DEVICE_PINNED_PTR].empty() || !alloc[HOST_PTR].empty() || !alloc[PINNED_PTR].empty() || !alloc[MAPPED_PTR].empty() || !alloc[MANAGED_PTR].empty()) {
       printfCULQCD("The following internal memory allocations were not freed.");
       printfCULQCD("\n");
       print_alloc_header();
       print_alloc(DEVICE_PTR);
+      print_alloc(MANAGED_PTR);
       print_alloc(DEVICE_PINNED_PTR);
       print_alloc(HOST_PTR);
       print_alloc(PINNED_PTR);
@@ -473,9 +591,8 @@ namespace CULQCD {
 
 
 
-
 static void FreeMemoryType(AllocType type){
-	const char *type_str[] = {"Device", "Device Pinned", "Host  ", "Pinned", "Mapped"};
+	const char *type_str[] = {"Device", "Device Pinned", "Host", "Pinned", "Mapped", "Managed"};
 	std::map<void *, MemAlloc>::iterator entry;
 	std::map<void *, MemAlloc>::iterator next_entry;
 
@@ -486,6 +603,7 @@ static void FreeMemoryType(AllocType type){
 		a.func.c_str(), a.file.c_str(), a.line);
 		next_entry++;
 		if(type == DEVICE_PTR) dev_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
+		if(type == MANAGED_PTR) managed_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
 		else if(type == DEVICE_PINNED_PTR )	dev_pinned_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
 		else host_free_(a.func.c_str(), a.file.c_str(), a.line, ptr); 
 	}
@@ -498,6 +616,12 @@ void FreeAllMemory(){
       printfCULQCD("Releasing DEVICE internal memory allocations not freed by user:\n");
       print_alloc_header();
       FreeMemoryType(DEVICE_PTR);
+      printfCULQCD("\n");
+    }
+    if (!alloc[MANAGED_PTR].empty() ) {
+      printfCULQCD("Releasing MANAGED internal memory allocations not freed by user:\n");
+      print_alloc_header();
+      FreeMemoryType(MANAGED_PTR);
       printfCULQCD("\n");
     }
     if (!alloc[DEVICE_PINNED_PTR].empty() ) {
@@ -524,18 +648,8 @@ void FreeAllMemory(){
       FreeMemoryType(HOST_PTR);
       printfCULQCD("\n");
     }
-    /*if (!alloc[DEVICE_PTR].empty() || !alloc[HOST_PTR].empty() || !alloc[PINNED].empty() || !alloc[MAPPED].empty() ) {
-      printfCULQCD("Releasing internal memory allocations not freed by user:\n");
-      print_alloc_header();
-      FreeAllDeviceMemory();
-      FreeAllHostMemory();
-      FreeAllHostMemory(HOST_PTR);
-      FreeAllHostMemory(PINNED);
-      FreeAllHostMemory(MAPPED);
-      printfCULQCD("\n");
-    }*/
+    assertAllMemFree();
   }
-
 
 
 } 
