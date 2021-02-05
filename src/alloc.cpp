@@ -602,10 +602,26 @@ static void FreeMemoryType(AllocType type){
 		printfCULQCD("%s  %15p  %15lu  %s(), %s:%d\n", type_str[type], ptr, (unsigned long) a.base_size,
 		a.func.c_str(), a.file.c_str(), a.line);
 		next_entry++;
-		if(type == DEVICE_PTR) dev_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
-		if(type == MANAGED_PTR) managed_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
-		else if(type == DEVICE_PINNED_PTR )	dev_pinned_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
-		else host_free_(a.func.c_str(), a.file.c_str(), a.line, ptr); 
+		switch(type){
+			case DEVICE_PTR:
+				dev_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
+			break;
+			case MANAGED_PTR:
+				managed_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
+			break;
+			case DEVICE_PINNED_PTR:
+				dev_pinned_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
+			break;
+			case HOST_PTR:
+				host_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
+			break;
+			case PINNED_PTR:
+				host_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
+			break;
+			case MAPPED_PTR:
+				host_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
+			break;
+		}
 	}
 }
 
