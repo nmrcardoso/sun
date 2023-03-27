@@ -5,7 +5,8 @@ namespace CULQCD{
 ////////////////////////////////////
 ////////////////////////////////////
 template<bool UseTex, class Real, ArrayType atype> 
-DEVICE msun N3( WLOPArg<Real> arg,int id, int l1, int muvolume, msun line_left, msun line_right){
+DEVICE void N3( WLOPArg<Real> arg,int id, int l1, int muvolume, msun line_left, msun line_right,int  gfoffset1, int * pos){
+    //if(id==0)printf("the symmetry inside N3 is %d\n",arg.symmetry);
 	msun mop=msun::zero();
 	{
 	///////////////////////////////////////////////////
@@ -47,8 +48,19 @@ DEVICE msun N3( WLOPArg<Real> arg,int id, int l1, int muvolume, msun line_left, 
 			link0 *= GAUGE_LOAD_DAGGER<UseTex, atype, Real>( arg.gaugefield, ids[1]+ dmu[il]*DEVPARAMS::Volume, DEVPARAMS::size);
 		}
 		msun link = line0 * link0.dagger() * line0 * line_right;
-		mop += link;
+		if(arg.symmetry==0 || arg.symmetry==2) mop += link;//sigma_g_plus sigma_u_plus
+		if(arg.symmetry==4 || arg.symmetry==5){//pi_g pi_u
+		if(il==0)mop += link;
+		if(il==1)mop += timesI(link);
+		}
+
+		if(arg.symmetry==6 || arg.symmetry==7){//delta_g , delta_u
+		if(il==0)mop += link;
+		if(il==1)mop -= link;
+		}
 	}
+	
+	
 	
 	
 	//2 comp, in downway
@@ -68,7 +80,16 @@ DEVICE msun N3( WLOPArg<Real> arg,int id, int l1, int muvolume, msun line_left, 
 			ids[1]=Index_4D_Neig_NM(ids[1], dmu[il],1);
 		}
 		msun link = line0 * link0.dagger() * line0 * line_right;
-		mop += link;
+		if(arg.symmetry==0 || arg.symmetry==2)mop += link;//sigma_g_plus, sigma_u_plus
+		if(arg.symmetry==4 ||arg.symmetry==5){//pi_g, pi_u
+			if(il==0) mop-=link;//pi_u
+			if(il==1)mop-=timesI(link);//pi_u
+		}
+
+		if(arg.symmetry==6 || arg.symmetry==7){//delta_g, delta_u
+			if(il==0)mop+=link;
+			if(il==1)mop-=link;
+		}
 	}
 	///////////////////////////////////////////////////
 	//                                               //
@@ -103,7 +124,24 @@ DEVICE msun N3( WLOPArg<Real> arg,int id, int l1, int muvolume, msun line_left, 
 			link0 *= GAUGE_LOAD_DAGGER<UseTex, atype, Real>( arg.gaugefield, ids[1]+ dmu[il]*DEVPARAMS::Volume, DEVPARAMS::size);
 		}
 		msun link = line_left * line0 * link0.dagger() * line0;
-		mop += link;
+		if (arg.symmetry==0) mop += link;//sigma_g_plus
+		if (arg.symmetry==2) mop -= link;//sigma_u_plus
+		if(arg.symmetry==5){
+			if (il==0) mop += link;//pi_u
+			if (il==1) mop += timesI(link);
+		}
+		if(arg.symmetry==4){
+			if (il==0) mop -= link;//pi_g
+			if (il==1) mop -= timesI(link);
+		}
+		if(arg.symmetry==6){//delta_g
+			if(il==0)mop+=link;
+			if(il==1)mop-=link;
+		}
+		if(arg.symmetry==7){//delta_u
+			if(il==0)mop-=link;
+			if(il==1)mop+=link;
+		}
 	}
 	
 	//2 comp, in downway
@@ -123,11 +161,30 @@ DEVICE msun N3( WLOPArg<Real> arg,int id, int l1, int muvolume, msun line_left, 
 			ids[1]=Index_4D_Neig_NM(ids[1], dmu[il],1);
 		}
 		msun link = line_left * line0 * link0.dagger() * line0;
-		mop += link;
+
+		if(arg.symmetry==0)mop += link;//sigma_g_plus
+		if(arg.symmetry==2)mop -= link;//sigma_u_plus
+		if(arg.symmetry==5){
+		if(il==0)mop -= link;//pi_u
+		if(il==1)mop -= timesI(link);//pi_u
+		}
+		if(arg.symmetry==4){
+		if(il==0)mop += link;//pi_g
+		if(il==1)mop += timesI(link);//pi_g
+		}
+		if(arg.symmetry==6){//delta_g
+			if(il==0)mop+=link;
+			if(il==1)mop-=link;
+		}
+		if(arg.symmetry==7){//delta_u
+			if(il==0)mop-=link;
+			if(il==1)mop+=link;
+		}
 	}
-	}
+	
 	mop/=(2.0*sqrt(2.0));
-	return mop;
+	GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + (*pos) * DEVPARAMS::Volume, gfoffset1);
+	(*pos)++;
 }
 
-}
+}}

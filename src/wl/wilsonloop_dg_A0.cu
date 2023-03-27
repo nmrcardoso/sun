@@ -15,7 +15,7 @@
 #include <index.h>
 #include <device_PHB_OVR.h>
 #include <reunitlink.h>
-#include <staple.h>
+
 #include <comm_mpi.h>
 #include <exchange.h>
 #include <texture_host.h>
@@ -45,7 +45,7 @@ template<class Real>
 struct WLArgA0{
  const complex *gaugefield;
  const complex *fieldOp;
-  Real *wloop;
+  complex *wloop;
   int radius;
   int Tmax;
   int mu;
@@ -73,7 +73,7 @@ __device__ __forceinline__ T Aldg(const T* ptr) {
 template<int blockSize, bool UseTex, class Real, ArrayType atype>
 __global__ void kernel_WilsonLoop_A0(WLArgA0<Real> arg){
 
-  typedef cub::BlockReduce<Real, blockSize> BlockReduce;
+  typedef cub::BlockReduce<complex, blockSize> BlockReduce;
   __shared__ typename BlockReduce::TempStorage temp_storage;  
 
   int id = INDEX1D();
@@ -96,15 +96,15 @@ __global__ void kernel_WilsonLoop_A0(WLArgA0<Real> arg){
         int idOp = 0;
           for(int iop = 0; iop < arg.opN; iop++)
           for(int jop = 0; jop < arg.opN; jop++){
-            msun linkb = msun::zero();
-            if(id < DEVPARAMS::Volume) linkb = GAUGE_LOAD<false, atype, Real>( arg.fieldOp, id + iop * DEVPARAMS::Volume, gfoffset); //bottom space links
-            Real w = 0.0;
+		        msun linkb = msun::zero();
+		        if(id < DEVPARAMS::Volume) linkb = GAUGE_LOAD<false, atype, Real>( arg.fieldOp, id + iop * DEVPARAMS::Volume, gfoffset); //bottom space links
+		        complex w=0.0;
 		        if(id < DEVPARAMS::Volume){
 			        msun linkt = GAUGE_LOAD_DAGGER<false, atype, Real>( arg.fieldOp, idl + idt + jop * DEVPARAMS::Volume, gfoffset); //top space links
-			        w = (linkb * t1 * linkt * t0.dagger()).realtrace();
+			        w = (linkb * t1 * linkt * t0.dagger()).trace();
 		        }
                 int wloffset = it + idOp * (arg.Tmax+1); 
-				Real aggregate = BlockReduce(temp_storage).Reduce(w, Summ<Real>());
+				complex aggregate = BlockReduce(temp_storage).Reduce(w, Summ<complex>());
 				if (threadIdx.x == 0) CudaAtomicAdd(arg.wloop + wloffset, aggregate);
 				__syncthreads();
                 idOp++;            
@@ -137,10 +137,8 @@ private:
     Timer WilsonLoop_A0time;
 #endif
 	TuneParam tp;
-	Real *wloop_tmp;
+	complex *wloop_tmp;
     size_t wloop_mem;
-	Real *field_tmp;
-    size_t field_mem;
 
    unsigned int sharedBytesPerThread() const { return 0; }
    unsigned int sharedBytesPerBlock(const TuneParam &param) const { return 0; }
@@ -198,8 +196,8 @@ public:
     return ps.str();
   }
   void preTune() { 
-    wloop_mem = arg.opN*arg.opN * (arg.Tmax+1) * sizeof(Real);
-	wloop_tmp = (Real*) safe_malloc( wloop_mem );
+    wloop_mem = arg.opN*arg.opN * (arg.Tmax+1) * sizeof(complex);
+	wloop_tmp = (complex*) safe_malloc( wloop_mem );
   	CUDA_SAFE_CALL(cudaMemcpy(wloop_tmp, arg.wloop, wloop_mem, cudaMemcpyDeviceToHost));	
   }
   void postTune() {  
@@ -217,7 +215,7 @@ public:
 
 
 template<bool UseTex, class Real>
-void CalcWilsonLoop_A0(gauge array, Sigma_g_plus<Real> *arg, int radius, int mu){
+void CalcWilsonLoop_A0(gauge array, symmetry_sector<Real> *arg, int radius, int mu){
   Timer mtime;
   mtime.start(); 
   WLArgA0<Real> argK;
@@ -245,7 +243,7 @@ void CalcWilsonLoop_A0(gauge array, Sigma_g_plus<Real> *arg, int radius, int mu)
 
 
 template<class Real>
-void CalcWilsonLoop_A0(gauge array, Sigma_g_plus<Real> *arg, int radius, int mu){
+void CalcWilsonLoop_A0(gauge array, symmetry_sector<Real> *arg, int radius, int mu){
   if(PARAMS::UseTex){
     GAUGE_TEXTURE(array.GetPtr(), true);
     CalcWilsonLoop_A0<true, Real>(array, arg, radius, mu);
@@ -254,7 +252,7 @@ void CalcWilsonLoop_A0(gauge array, Sigma_g_plus<Real> *arg, int radius, int mu)
 }
 
 
-template void CalcWilsonLoop_A0<double>(gauged array, Sigma_g_plus<double> *arg, int radius, int mu);
+template void CalcWilsonLoop_A0<double>(gauged array, symmetry_sector<double> *arg, int radius, int mu);
 
 
 

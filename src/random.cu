@@ -45,6 +45,7 @@ kernel_random(cuRNGState *state, randArg arg ){
     curand_init(arg.seed, idd, 0, &state[id]);
     #else
     curand_init(arg.seed, id, 0, &state[id]);
+
     #endif
 }
 

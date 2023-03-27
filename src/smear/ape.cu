@@ -77,7 +77,7 @@ __global__ void kernel_APE_Space(APEArg<Real> arg, int mu){
 	  }
 	  msun U = GAUGE_LOAD<UseTex, atype, Real>( arg.arrayin,  id + muvolume, offset);
     link = U + staple * arg.w;
-		link /= ( 1.0 + 6.0 * arg.w );
+	link /= ( 1.0 + 6.0 * arg.w );
 if(0){
      /* Start with a unitarized version */
     U = link;

@@ -1,4 +1,3 @@
-
 #ifndef HOSTDEVICE_INDEX_H
 #define HOSTDEVICE_INDEX_H
 

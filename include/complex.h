@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <assert.h>
 #include <math.h>
-
+#include <cmath>
 
 #include <cuda_common.h>
 #include <cuda_vector_types.h>
@@ -117,7 +117,7 @@ class _complex {
     return result;
   }
     friend M_HOSTDEVICE _complex<Real> operator-(const Real REF(a), const _complex<Real>& z){
-      return _complex(a - z.val.x,-z.val.y);
+      return _complex(a - z.val.x, -z.val.y);
     }
   // negate a complex number
   M_HOSTDEVICE _complex<Real> operator-() const {
@@ -331,7 +331,7 @@ class _complex {
       return atan2(z.imag(), z.real());
     }
 
-
+#  if __GNUC_PREREQ(6,0)
     friend M_HOSTDEVICE _complex<Real> sin(const _complex<Real>& z){
       const Real x = z.val.x;
       const Real y = z.val.y;
@@ -433,7 +433,7 @@ class _complex {
     friend M_HOSTDEVICE _complex<Real> polar(const Real &rho, const Real &theta){
       return make_complex(rho * cos(theta), rho * sin(theta));
     }
-
+#endif
  
 
 };

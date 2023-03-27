@@ -1003,7 +1003,7 @@ complex CALL_FFT(gauge _pgauge, Real alpha, bool landautune, Real stopvalue, int
 		data = quality.Run();
 		theta_new = data.imag();
 		Fg_new =  data.real();
-		diff = abs(Fg_old - Fg_new);
+		diff = std::abs(Fg_old - Fg_new);
 		if((iter%verbose)==0) printfCULQCD("Iter: %d\tFg = %.12e\ttheta = %.12e\tDelta = %.12e\n", iter, Fg_new, theta_new, diff );
 		if ( landautune && ((Fg_new - Fg_old) < -1e-14) ) {
 			if(alpha > 0.01){

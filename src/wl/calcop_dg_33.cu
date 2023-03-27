@@ -15,7 +15,7 @@
 #include <index.h>
 #include <device_PHB_OVR.h>
 #include <reunitlink.h>
-#include <staple.h>
+
 #include <comm_mpi.h>
 #include <exchange.h>
 #include <texture_host.h>
@@ -535,7 +535,7 @@ __global__ void kernel_CalcOPsF_33(WLOPArg<Real> arg){
             mop[5] -= timesI(link);
             mop[6] -= timesI(link);
             mop[7] += timesI(link);
-            mop[8] += link;
+            mop[8] -= link;
             mop[9] += link;
             mop[10] += link;
             mop[11] -= link;
@@ -565,7 +565,7 @@ __global__ void kernel_CalcOPsF_33(WLOPArg<Real> arg){
             mop[5] -= link;
             mop[6] -= link;
             mop[7] += link;
-            mop[8] -= link;
+            mop[8] += link;
             mop[9] -= link;
             mop[10] -= link;
             mop[11] += link;

@@ -11,40 +11,42 @@ namespace CULQCD{
 /////      Calculate Sigma_g^+ states (4 for now)/////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
+enum state_symmetry{
+	sigma_g_plus,//0
+	sigma_g_minus,//1
+	sigma_u_plus,//2
+	sigma_u_minus,//3
+	pi_g, //4
+	pi_u,//5
+	delta_g,//6 
+	delta_u//7
+};
 template<class Real>
-class Sigma_g_plus{
+class symmetry_sector{
 	public:
 		int Rmax;
 		int Tmax;
 		int opN;
 		int totalOpN;
-		Real *wloop;
-		Real *wloop_h;
+		int symmetry;//Alireza added
+		complex *wloop;
+		complex *wloop_h;
 		size_t wloop_size;
 		//Store all space line components
 		gauge fieldOp;
-	Sigma_g_plus(const int _Rmax, const int _Tmax) : Rmax(_Rmax), Tmax(_Tmax){
-		opN = 10;
-		totalOpN = opN * opN;
-		fieldOp.Set( SOA, Device, false);
-		fieldOp.Allocate(PARAMS::Volume * opN);
-		wloop_size = totalOpN * (Tmax+1) * sizeof(Real);
-		wloop = (Real*) dev_malloc( wloop_size );
-		wloop_h = (Real*) safe_malloc( wloop_size );
-	}
-	~Sigma_g_plus(){
-		dev_free(wloop);
-		host_free(wloop_h);
-		fieldOp.Release();
-	}
+	symmetry_sector(const int _Rmax, const int _Tmax,const int _opN, int sym);
+	~symmetry_sector();
 };
+
+
+///////////////////////////////////////////////////////
 // Calculate the 4 types of space Wilson lines for a give radius and direction mu
 template<class Real>
-void CalcWLOPs_A0(gauge array, Sigma_g_plus<Real> *arg, int radius, int mu);
+void CalcWLOPs_A0(gauge array, symmetry_sector<Real> *arg, int radius, int mu);
 
 // Calculate the Wilson loop for 4 operators for a give radius and direction mu
 template<class Real>
-void CalcWilsonLoop_A0(gauge array, Sigma_g_plus<Real> *arg, int radius, int mu);
+void CalcWilsonLoop_A0(gauge array, symmetry_sector<Real> *arg, int radius, int mu);
 
 
 

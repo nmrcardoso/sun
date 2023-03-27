@@ -71,6 +71,10 @@ namespace CULQCD {
   void managed_free_(const char *func, const char *file, int line, void *ptr);
 
   // strip path from __FILE__
+#  if __GNUC_PREREQ(6,0)
+#else
+  #define constexpr 
+#endif
   inline constexpr const char* str_end(const char *str) { return *str ? str_end(str + 1) : str; }
   inline constexpr bool str_slant(const char *str) { return *str == '/' ? true : (*str ? str_slant(str + 1) : false); }
   inline constexpr const char* r_slant(const char* str) { return *str == '/' ? (str + 1) : r_slant(str - 1); }

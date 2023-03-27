@@ -16,12 +16,13 @@ namespace CULQCD{
 
 
 
-template <class Real> 
+template <class Real, int actiontype> 
 class OverRelaxation: Tunable{
 private:
-   typedef void (*TFuncPtr)(complex*, int, int);
+   typedef void (*TFuncPtr)(complex*, complex*, int, int);
    TFuncPtr kernel_pointer;
    gauge array;
+   gauge *staple;
    int size;
    double timesec;
    int grid[4];
@@ -41,7 +42,7 @@ private:
 
 public:
    OverRelaxation(gauge &array);
-   ~OverRelaxation(){};
+   ~OverRelaxation();
 
 
    void Run(const cudaStream_t &stream);

@@ -621,7 +621,7 @@ static void FreeMemoryType(AllocType type){
 			case MAPPED_PTR:
 				host_free_(a.func.c_str(), a.file.c_str(), a.line, ptr);
 			break;
-		}
+		} 
 	}
 }
 

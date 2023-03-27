@@ -7,5 +7,8 @@ struct WLOPArg{
   int radius;
   int mu;
   int opN;
+  int symmetry;
+  int pos;
 };
 }
+

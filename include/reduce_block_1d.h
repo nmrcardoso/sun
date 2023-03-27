@@ -38,7 +38,7 @@ inline __device__ void reduce_block_1d(T *ptr, const T &thread_val){
 //                     <<<,,threads_per_block * sizeof(T),>>>
 
 
-
+#if __CUDA_ARCH__ > 300
 
 //#define CUDA_SHFL_DOWN(val, offset) __shfl_down(val, offset)
 #define FULL_MASK 0xffffffff
@@ -108,7 +108,7 @@ inline __device__ void reduce_block_1d_shfl(T *ptr, const T &thread_val){
 //DON'T FORGET to reserve the shared memory need by this in the kernel parameters:
 //  
 
-
+#endif
 
 
 }

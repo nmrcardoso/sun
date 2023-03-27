@@ -24,12 +24,14 @@
 #include <texture_host.h>
 
 
+
+#include "staple.cuh"
+
+
 using namespace std;
 
 
 namespace CULQCD{
-
-
 
 
 /**
@@ -39,62 +41,12 @@ namespace CULQCD{
 	@param parity if 0 update even lattice sites, if 1 update odd lattice sites
 	@param mu lattice direction to update links 
 */
-template <bool UseTex, ArrayType atype, class Real> 
+template <bool UseTex, ArrayType atype, class Real, bool stapleSOA12type, int actiontype> 
 __global__ void 
-kernel_PHeatBath_evenodd(complex *array, cuRNGState *state, int oddbit, int mu){
-	int id = INDEX1D();
-	if(id >= DEVPARAMS::HalfVolume) return;
-
-	#ifdef MULTI_GPU
-		int x[4];
-		Index_4D_EO(x, id, oddbit);
-		for(int i=0; i<4;i++)x[i]+=param_border(i);
-		int idxoddbit = ((((x[3] * param_GridG(2) + x[2]) * param_GridG(1)) + x[1] ) * param_GridG(0) + x[0]) >> 1 ;
-		idxoddbit += oddbit  * param_HalfVolumeG();
-		int mustride = DEVPARAMS::VolumeG;
-		int muvolume = mu * mustride;
-		int offset = mustride * 4;
-	#else
-		int mustride = DEVPARAMS::Volume;
-		int muvolume = mu * mustride;
-		int offset = DEVPARAMS::size;
-		int idxoddbit = id + oddbit  * param_HalfVolume();
-	#endif
-
-	msun staple = msu3::zero();
-	int newidmu1 = Index_4D_Neig_EO(id, oddbit, mu, 1);
-	for(int nu = 0; nu < 4; nu++){ if(mu == nu) continue;
-		msun link;	
-		int nuvolume = nu * mustride;
-		//UP	
-		link = GAUGE_LOAD<UseTex, atype, Real>( array,  idxoddbit + nuvolume, offset);
-		link *= GAUGE_LOAD<UseTex, atype, Real>( array, Index_4D_Neig_EO(id, oddbit, nu, 1) + muvolume, offset);	
-		link *= GAUGE_LOAD_DAGGER<UseTex, atype, Real>( array, newidmu1 + nuvolume, offset);
-		staple += link;
-		//DOWN	
-		int newidnum1 = Index_4D_Neig_EO(id, oddbit, nu, -1);
-		link = GAUGE_LOAD_DAGGER<UseTex, atype, Real>( array,  newidnum1 + nuvolume, offset);	
-		link *= GAUGE_LOAD<UseTex, atype, Real>( array, newidnum1  + muvolume, offset);
-		link *= GAUGE_LOAD<UseTex, atype, Real>( array, Index_4D_Neig_EO(id, oddbit, mu, 1, nu,  -1) + nuvolume, offset);
-		staple += link;
-	}
-	//Copy state to local memory for efficiency
-    cuRNGState localState = state[ id ];
-    idxoddbit += muvolume;
-	msun U = GAUGE_LOAD<UseTex, atype, Real>( array, idxoddbit, offset);
-	heatBathSUN<Real>( U, staple.dagger(), localState );
-    state[ id ] = localState;
-	GAUGE_SAVE<atype, Real>( array, U, idxoddbit, offset);
-}
-
-
-template <bool UseTex, ArrayType atype, class Real> 
-__global__ void 
-kernel_PHeatBath_evenodd_SOA12(complex *array, cuRNGState *state, int oddbit, int mu){
+kernel_PHeatBath_evenodd(complex *array, complex *staple_array, cuRNGState *state, int oddbit, int mu){
 	int id = INDEX1D();
 	if(id >= param_HalfVolume()) return;	
 	#ifdef MULTI_GPU
-
 		int x[4];
 		Index_4D_EO(x, id, oddbit);
 		for(int i=0; i<4;i++)x[i]+=param_border(i);
@@ -111,29 +63,17 @@ kernel_PHeatBath_evenodd_SOA12(complex *array, cuRNGState *state, int oddbit, in
 		int muvolume = mu * mustride;
 		int offset = DEVPARAMS::size;
 	#endif
-	msun staple = msu3::zero();
-	int newidmu1 = Index_4D_Neig_EO(id, oddbit, mu, 1);
-	for(int nu = 0; nu < 4; nu++)  if(mu != nu) {
-      	int dx[4] = {0, 0, 0, 0};
-		msun link;	
-		int nuvolume = nu * mustride;
-		link = GAUGE_LOAD<UseTex, atype, Real>( array,  idxoddbit + nuvolume, offset);
-		dx[nu]++;
-		link *= GAUGE_LOAD<UseTex, atype, Real>( array, Index_4D_Neig_EO(x,dx,DEVPARAMS::GridWGhost) + (1-oddbit) * param_HalfVolumeG() + muvolume, offset);	
-		dx[nu]--;
-		dx[mu]++;
-		link *= GAUGE_LOAD_DAGGER<UseTex, atype, Real>( array, Index_4D_Neig_EO(x,dx,DEVPARAMS::GridWGhost) + (1-oddbit) * param_HalfVolumeG() + nuvolume, offset);
-		staple += link;
-
-		dx[mu]--;
-		dx[nu]--;
-		link = GAUGE_LOAD_DAGGER<UseTex, atype, Real>( array,  Index_4D_Neig_EO(x,dx,DEVPARAMS::GridWGhost) + (1-oddbit) * param_HalfVolumeG() + nuvolume, offset);	
-		link *= GAUGE_LOAD<UseTex, atype, Real>( array, Index_4D_Neig_EO(x,dx,DEVPARAMS::GridWGhost) + (1-oddbit) * param_HalfVolumeG()  + muvolume, offset);
-		dx[mu]++;
-		link *= GAUGE_LOAD<UseTex, atype, Real>( array, Index_4D_Neig_EO(x,dx,DEVPARAMS::GridWGhost) + oddbit * param_HalfVolumeG() + nuvolume, offset);
-		staple += link;
+	msun staple = msun::zero();
+	if( actiontype == 1 || actiontype == 2 ){
+		staple = GAUGE_LOAD<false, SOA, Real>( staple_array, id, param_HalfVolume());
 	}
-	//Copy state to local memory for efficiency
+	else {
+		if( stapleSOA12type )
+			Staple_SOA12<UseTex, atype, Real>(array, mu, staple, x, id, oddbit, idxoddbit, mustride, muvolume, offset);
+		else
+			Staple<UseTex, atype, Real>(array, mu, staple, id, oddbit, idxoddbit, mustride, muvolume, offset);
+	}
+	//if(id==0) staple.print();
     cuRNGState localState = state[ id ];
     idxoddbit += muvolume;
 	msun U = GAUGE_LOAD<UseTex, atype, Real>( array, idxoddbit, offset);
@@ -148,8 +88,8 @@ kernel_PHeatBath_evenodd_SOA12(complex *array, cuRNGState *state, int oddbit, in
 
 
 
-template <class Real> 
-HeatBath<Real>::HeatBath(gauge &array, RNG &randstates):array(array), randstates(randstates){
+template <class Real, int actiontype> 
+HeatBath<Real, actiontype>::HeatBath(gauge &array, RNG &randstates):array(array), randstates(randstates){
 	SetFunctionPtr();
 	size = 1;
 	for(int i=0;i<4;i++){
@@ -158,42 +98,50 @@ HeatBath<Real>::HeatBath(gauge &array, RNG &randstates):array(array), randstates
 	} 
 	size = size >> 1;
 	timesec = 0.0;
+	if( actiontype == 1 || actiontype == 2 ) staple = GetStapleArray<Real>();
 }
 
-template <class Real> 
-void HeatBath<Real>::SetFunctionPtr(){
+template <class Real, int actiontype> 
+HeatBath<Real, actiontype>::~HeatBath(){ FreeStapleArray(); }
+
+
+template <class Real, int actiontype> 
+void HeatBath<Real, actiontype>::SetFunctionPtr(){
 	kernel_pointer = NULL;
 	tex = PARAMS::UseTex;
 	if(array.EvenOdd()){
 	    if(tex){
 			#if (NCOLORS == 3)
-	        if(array.Type() == SOA) kernel_pointer = &kernel_PHeatBath_evenodd<true, SOA, Real>;		
-	        if(array.Type() == SOA12) kernel_pointer = &kernel_PHeatBath_evenodd_SOA12<true, SOA12, Real>;
-	        if(array.Type() == SOA8) kernel_pointer = &kernel_PHeatBath_evenodd<true, SOA8, Real>;
+	        if(array.Type() == SOA) kernel_pointer = &kernel_PHeatBath_evenodd<true, SOA, Real, false, actiontype>;		
+	        if(array.Type() == SOA12) kernel_pointer = &kernel_PHeatBath_evenodd<true, SOA12, Real, true, actiontype>;
+	        if(array.Type() == SOA8) kernel_pointer = &kernel_PHeatBath_evenodd<true, SOA8, Real, false, actiontype>;
 			#else
-	        kernel_pointer = &kernel_PHeatBath_evenodd<true, SOA, Real>;	
+	        kernel_pointer = &kernel_PHeatBath_evenodd<true, SOA, Real, false, actiontype>;	
 			#endif
 	    }
 	    else{
 			#if (NCOLORS == 3)
-	        if(array.Type() == SOA) kernel_pointer = &kernel_PHeatBath_evenodd<false, SOA, Real>;
-	        if(array.Type() == SOA12) kernel_pointer = &kernel_PHeatBath_evenodd_SOA12<false, SOA12, Real>;
-	        if(array.Type() == SOA8) kernel_pointer = &kernel_PHeatBath_evenodd<false, SOA8, Real>;
+	        if(array.Type() == SOA) kernel_pointer = &kernel_PHeatBath_evenodd<false, SOA, Real, false, actiontype>;
+	        if(array.Type() == SOA12) kernel_pointer = &kernel_PHeatBath_evenodd<false, SOA12, Real, true, actiontype>;
+	        if(array.Type() == SOA8) kernel_pointer = &kernel_PHeatBath_evenodd<false, SOA8, Real, false, actiontype>;
 			#else
-	        kernel_pointer = &kernel_PHeatBath_evenodd<false, SOA, Real>;	
+	        kernel_pointer = &kernel_PHeatBath_evenodd<false, SOA, Real, false, actiontype>;	
 			#endif
 	    }
 	}
 	if(kernel_pointer == NULL) errorCULQCD("No kernel HeatBath function exist for this gauge array...");
 }
 
-template <class Real> 
-void HeatBath<Real>::apply(const cudaStream_t &stream){
+template <class Real, int actiontype> 
+void HeatBath<Real, actiontype>::apply(const cudaStream_t &stream){
       TuneParam tp = tuneLaunch(*this, getTuning(), getVerbosity());
-      kernel_pointer<<<tp.grid,tp.block, 0, stream>>>(array.GetPtr(), randstates.state, parity, dir);
+      if(actiontype == 1 || actiontype == 2) 
+      	kernel_pointer<<<tp.grid, tp.block, 0, stream>>>(array.GetPtr(), staple->GetPtr(), randstates.state, parity, dir);
+  	  else
+      	kernel_pointer<<<tp.grid, tp.block, 0, stream>>>(array.GetPtr(), 0, randstates.state, parity, dir);
 }
-template <class Real> 
-void HeatBath<Real>::Run(const cudaStream_t &stream){
+template <class Real, int actiontype> 
+void HeatBath<Real, actiontype>::Run(const cudaStream_t &stream){
 #ifdef TIMMINGS
     mtime.start();
 #endif
@@ -204,6 +152,8 @@ void HeatBath<Real>::Run(const cudaStream_t &stream){
     GAUGE_TEXTURE(array.GetPtr(), true);
 	for(parity=0; parity < 2; parity++)
 	for(dir = 0; dir < 4; dir++){
+		if(actiontype==1) CalculateStaple<Real>(array, parity, dir, 1);	
+		else if(actiontype==2) CalculateStaple<Real>(array, parity, dir, 2);	    
 		apply(stream);	
 		//EXCHANGE DATA!!!!!
 	    #ifdef MULTI_GPU
@@ -220,23 +170,28 @@ void HeatBath<Real>::Run(const cudaStream_t &stream){
     timesec = mtime.getElapsedTimeInSec();
 #endif
 }
-template <class Real> 
-void HeatBath<Real>::Run(){
+
+
+
+
+
+template <class Real, int actiontype> 
+void HeatBath<Real, actiontype>::Run(){
 	Run(0);
 }
-template <class Real> 
-double HeatBath<Real>::time(){
+template <class Real, int actiontype> 
+double HeatBath<Real, actiontype>::time(){
 	return timesec;
 }
 
-template <class Real> 
-void HeatBath<Real>::stat(){
+template <class Real, int actiontype> 
+void HeatBath<Real, actiontype>::stat(){
 	COUT << "HeatBath:  " <<  time() << " s\t"  << bandwidth() << " GB/s\t" << flops() << " GFlops"  << endl;
 }
 
 
-template <class Real> 
-long long HeatBath<Real>::flop() const {
+template <class Real, int actiontype> 
+long long HeatBath<Real, actiontype>::flop() const {
     //minumum flop for heatbath
 	//NEEEDDDDD TO RECOUNT THIS PART!!!!!!!!!!!!!!!!!!!!!!!!! 
 	#if (NCOLORS == 3)
@@ -254,8 +209,8 @@ long long HeatBath<Real>::flop() const {
 	return ThreadFlop_phb;
 	#endif
 }
-template <class Real> 
-long long HeatBath<Real>::bytes() const { 
+template <class Real, int actiontype> 
+long long HeatBath<Real, actiontype>::bytes() const { 
     #ifdef MULTI_GPU
     return (20LL * array.getNumParams() * sizeof(Real) + 2LL * sizeof(cuRNGState)) * size * numnodes();
 	#else
@@ -263,12 +218,12 @@ long long HeatBath<Real>::bytes() const {
 	#endif
 }
 
-template <class Real> 
-double HeatBath<Real>::flops(){
+template <class Real, int actiontype> 
+double HeatBath<Real, actiontype>::flops(){
 	return ((double)flop() * 8 * 1.0e-9) / timesec;
 }
-template <class Real> 
-double HeatBath<Real>::bandwidth(){
+template <class Real, int actiontype> 
+double HeatBath<Real, actiontype>::bandwidth(){
 	return (double)bytes() * 8 / (timesec * (double)(1 << 30));
 }
 
@@ -277,7 +232,11 @@ double HeatBath<Real>::bandwidth(){
 
 
 
-template class HeatBath<float>;
-template class HeatBath<double>;
+template class HeatBath<float, 0>;
+template class HeatBath<float, 1>;
+template class HeatBath<float, 2>;
+template class HeatBath<double, 0>;
+template class HeatBath<double, 1>;
+template class HeatBath<double, 2>;
 
 }

@@ -15,7 +15,7 @@
 #include <index.h>
 #include <device_PHB_OVR.h>
 #include <reunitlink.h>
-#include <staple.h>
+
 #include <comm_mpi.h>
 #include <exchange.h>
 #include <texture_host.h>
@@ -41,21 +41,46 @@
 #include<mop/mo1.cuh>
 #include<mop/mo2.cuh>
 #include<mop/mo3.cuh>
-#include<mop/mo4.cuh>
+//#include<mop/mo4.cuh>
+#include<mop/mo4_wag.cuh>
 //////////////////////
+
 using namespace std;
+
+
 namespace CULQCD{
+template<class Real>
+symmetry_sector<Real>::symmetry_sector(const int _Rmax, const int _Tmax,const int _opN,  int _sys) : Rmax(_Rmax), Tmax(_Tmax),opN(_opN), symmetry(_sys){
+	totalOpN = opN * opN; 
+	fieldOp.Set( SOA, Device, false);
+	fieldOp.Allocate(PARAMS::Volume * opN);
+	wloop_size = totalOpN * (Tmax+1) * sizeof(complex);
+	wloop = (complex*) dev_malloc( wloop_size );
+	wloop_h = (complex*) safe_malloc( wloop_size );
+}
+template<class Real>
+symmetry_sector<Real>::~symmetry_sector(){
+	dev_free(wloop);
+	host_free(wloop_h);
+	fieldOp.Release();
+	//printf("destructor of symmetry_sector called.\n");
+}
+
+template class symmetry_sector<float>;
+template class symmetry_sector<double>;
+
 
 template<bool UseTex, class Real, ArrayType atype>
 __global__ void kernel_CalcOPsF_A0_33(WLOPArg<Real> arg){
-  	int id = INDEX1D();
+	int id = INDEX1D();
 	if(id >= DEVPARAMS::Volume) return;
 	int x[4];
 	Index_4D_NM(id, x);
 	int muvolume = arg.mu * DEVPARAMS::Volume;
-	//int gfoffset = arg.opN * DEVPARAMS::Volume;
-
+	int pos=0;
 	int gfoffset1 = arg.opN * DEVPARAMS::Volume;
+	/////////// direct wilson line ///////////////////
+	if(arg.symmetry==0){
 	msun link = msun::identity();
 	for(int r = 0; r < arg.radius; r++){
 		int idx = Index_4D_Neig_NM(x, arg.mu, r);
@@ -65,156 +90,107 @@ __global__ void kernel_CalcOPsF_A0_33(WLOPArg<Real> arg){
         GAUGE_SAVE<SOA, Real>( arg.fieldOp, link, id, DEVPARAMS::Volume);
         return;
     }
-    // here is just for simple loop
 	else GAUGE_SAVE<SOA, Real>( arg.fieldOp, link, id, gfoffset1);
-/*
-	//COMMON PART
+		pos++;
+    }
+
+
+    //sigma_g_plus=0    | sigma_g_minus=1   |sigma_u_plus=2     |sigma_u_minus=3
+    //pi_g=4            |pi_u=5             |delta_g=6          |delta_u=7
+    
+	if(arg.symmetry==0||arg.symmetry==5|| arg.symmetry==6){
+		#pragma unroll
+		for(int l=1;l<=8;l++){
+			//MO0(WLOPArg<Real> arg,int id, int lx, int muvolume, int gfoffset1, int *pos)
+			MO0<UseTex, Real,atype>(arg ,id,l ,muvolume, gfoffset1, &pos);
+		}
+		}
+		
+	if (arg.symmetry==1|| arg.symmetry==6){
+	    #pragma unroll
+	    for (int l=1; l<=8;l++)
+	        MO1<UseTex, Real, atype>( arg, id,  1, l,  muvolume,  gfoffset1, &pos, 8);
+	}
+	
+//	if(arg.symmetry==3){
+//        msun link = msun::identity();
+//		for(int r = 0; r < arg.radius; r++){
+//		int idx = Index_4D_Neig_NM(x, arg.mu, r);
+//		link *= GAUGE_LOAD<UseTex, atype, Real>( arg.gaugefield, idx + muvolume, DEVPARAMS::size);
+//		}
+//		#pragma unroll
+//		for (int l=1;l<=12;l++){
+//		    MO4<UseTex, Real, atype>(arg, id,l,l,link ,gfoffset1, &pos);
+//		   }
+//	} this is from before wagner method
+	if(arg.symmetry==3){
+	    //these are base on wagner computation
+	    int rl[13]={0,0,0,0,0,1,1,2,2,3,3,4,4};
+            //rl=[0,1,2,3,4,5,6,7,8,9,10,11,12,13];
+        int rr[13]={0,1,2,3,4,4,5,5,6,6,7,7,8};
+        msun linkl = msun::identity();
+        msun linkm = msun::identity();
+        msun linkr = msun::identity();
+		for(int r = 0; r < rl[arg.radius]; r++){
+		int idx = Index_4D_Neig_NM(x, arg.mu, r);
+		linkl *= GAUGE_LOAD<UseTex, atype, Real>( arg.gaugefield, idx + muvolume, DEVPARAMS::size);
+		}
+		for(int r =rl[arg.radius] ; r < rr[arg.radius]; r++){
+		int idx = Index_4D_Neig_NM(x, arg.mu, r);
+		linkm *= GAUGE_LOAD<UseTex, atype, Real>( arg.gaugefield, idx + muvolume, DEVPARAMS::size);
+		}
+		for(int r =rr[arg.radius] ; r < arg.radius; r++){
+		int idx = Index_4D_Neig_NM(x, arg.mu, r);
+		linkr *= GAUGE_LOAD<UseTex, atype, Real>( arg.gaugefield, idx + muvolume, DEVPARAMS::size);
+		}
+		#pragma unroll
+		for (int l=1;l<=8;l++){
+		    MO4<UseTex, Real, atype>(arg, id,l,l,linkl, linkm, linkr ,gfoffset1, &pos);
+		   }
+	}
+	
+	
+	// pay attention to 3
+	if(arg.symmetry==2||arg.symmetry==4||arg.symmetry==7||arg.symmetry==3){
+	//#########################################################################
 	int halfline = (arg.radius + 1) / 2;
 	msun line_left = GAUGE_LOAD<UseTex, atype, Real>( arg.gaugefield, id + muvolume, DEVPARAMS::size);
 	for(int ir = 1; ir < halfline; ++ir) 
 		line_left *= GAUGE_LOAD<UseTex, atype, Real>( arg.gaugefield, Index_4D_Neig_NM(id, arg.mu, ir) + muvolume, DEVPARAMS::size);
-
 	halfline = arg.radius/2;
 	msun line_right = GAUGE_LOAD<UseTex, atype, Real>( arg.gaugefield, Index_4D_Neig_NM(id, arg.mu, halfline) + muvolume, DEVPARAMS::size);
 	for(int ir = halfline + 1; ir < arg.radius; ++ir)
 		line_right *= GAUGE_LOAD<UseTex, atype, Real>( arg.gaugefield, Index_4D_Neig_NM(id, arg.mu, ir) + muvolume, DEVPARAMS::size);
-// extended stape
-*/ 
-// the above part is not useful for when series N operators have been deactivated.
+	if(arg.symmetry==2||arg.symmetry==4||arg.symmetry==7){
+	#pragma unroll
+	for(int l=1;l<=12;l++)
+		N1< UseTex, Real, atype>(arg, id, l, muvolume, line_left, line_right, gfoffset1, &pos);
+	
+    }
+	if (arg.symmetry==3){
+		#pragma unroll
+		for(int l=1;l<=8;l++)
+			N2< UseTex, Real, atype>( arg, id, 1,  l,  muvolume, line_left, line_right, gfoffset1, &pos, 0);// offset if it is not 0, it compute both symmetry for epsilon
+    }// this has been removed for action 1
+   }
+    
+    if (arg.symmetry==3){
+    	msun link = msun::identity();
+    	for(int r = 0; r < arg.radius; r++){
+		int idx = Index_4D_Neig_NM(x, arg.mu, r);
+		link *= GAUGE_LOAD<UseTex, atype, Real>( arg.gaugefield, idx + muvolume, DEVPARAMS::size);
+		}
+    	//MO3(WLOPArg<Real> arg,int id, int lx1, int ly,int lx2,msun link,int gfoffset1, int *pos)
+    	MO3< UseTex, Real, atype>(arg,id, 1,  1, 1, link, gfoffset1, &pos);
+    	MO3< UseTex, Real, atype>(arg,id, 1,  2, 1, link, gfoffset1, &pos);
+    	MO3< UseTex, Real, atype>(arg,id, 2,  1, 1, link, gfoffset1, &pos);
+    	MO3< UseTex, Real, atype>(arg,id, 2,  2, 1, link, gfoffset1, &pos);
+    	MO3< UseTex, Real, atype>(arg,id, 2,  2, 2, link, gfoffset1, &pos);
+    }
 
-int index=1;
-//template<bool UseTex, class Real, ArrayType atype> DEVICE msun N1( WLOPArg<Real> arg,int id, int lx, int muvolume, msun line_left, msun line_right)
-/*
-{
-	msun mop;
-	const int n=4;
-	static int len_N1[n]={1,2,3,4};
-	#pragma unroll
-	for(int i=0; i<n; i++){
-		mop=N1< UseTex, Real, atype>(arg, id, len_N1[i], muvolume, line_left, line_right);
-		GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id +index*DEVPARAMS::Volume, gfoffset1);
-		index++;
-	}
-}
-*/
-//template<bool UseTex, class Real, ArrayType atype> 
-//DEVICE msun N2( WLOPArg<Real> arg,int id, int l1, int l2, int muvolume, msun line_left, msun line_right)
-/*
-{
-	msun mop;
-	const int n=6;
-	static int len1_N2[n]={1,1,2,2,1,3};
-	static int len2_N2[n]={1,2,1,2,3,1};
-	#pragma unroll
-	for(int i=0; i<n; i++){
-		mop=N2<UseTex, Real,atype>(arg, id, len1_N2[i], len2_N2[i], muvolume, line_left, line_right);
-		GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + index * DEVPARAMS::Volume, gfoffset1);
-		index++;
-	}
-}
-*/
-//template<bool UseTex, class Real, ArrayType atype> 
-//DEVICE msun N3( WLOPArg<Real> arg,int id, int l1, int muvolume, msun line_left, msun line_right)
-/*
-{
-	msun mop;
-	const int n=3;
-	static int len_N3[n]={1,2,3};
-	#pragma unroll
-	for(int i=0; i<n; i++){
-		mop=N3<UseTex, Real, atype>(arg, id, len_N3[i], muvolume, line_left, line_right);
-		GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + index * DEVPARAMS::Volume, gfoffset1);
-		index++;
-	}
-}
-*/
-// this part is for set MO0
-{
-msun mop;
-const int n=8;
-static int set0_l[n]={1, 2, 3, 4, 5, 6,7,8};
-#pragma unroll
-for(int i=0;i<n;i++){
-	mop=MO0<UseTex, Real, atype>(arg, id, set0_l[i],  muvolume);
-	GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + index * DEVPARAMS::Volume, gfoffset1);
-	index++;
-}
-}
-//
-///////////////////////////
-// this part is for set2 MO1
-/*
-{
-msun mop;
-const int n=20;
-static int set1_lx[n]={1,2,2,3,3,3,4,4,4,4,5,5,5,5,5,5,6,6,6,7};
-static int set1_ly[n]={1,1,2,1,2,3,1,2,3,4,1,2,3,3,4,5,1,2,3,1};
-//2,5,5,8,10,10,13,13,18,17,17,20,20,25,25,32,26,26,29,29,34,34,41,41, 37, 37, 39, 39,45,45
-#pragma unroll
-for(int i=0;i< n;i++){
-	mop=MO1<UseTex, Real, atype>(arg, id, set1_lx[i], set1_ly[i],  muvolume);
-	GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + index * DEVPARAMS::Volume, gfoffset1);
-	index++;
-}
-}
-*/
-
-/*
-//////////////////////////////
-// this part is for set3 MO2
-{
-msun mop;
-const int n=9;
-static int set2_l1x[n]={1,1,2,1,1,2,1,3,2};
-static int set2_ly[n]= {1,1,1,2,3,1,1,1,2};
-static int set2_l2x[n]={1,2,1,1,1,2,3,1,2};
-#pragma unroll
-for(int i=0;i<n;i++){
-	mop=MO2<UseTex, Real, atype>(arg, id, set2_l1x[i], set2_ly[i], set2_l2x[i],  muvolume); 
-	GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + index* DEVPARAMS::Volume, gfoffset1);
-	index++;
-}
 }
 
-*/
 
-//template<bool UseTex, class Real, ArrayType atype> 
-//DEVICE msun MO4(WLOPArg<Real> arg,int id, int lx, int ly, msun link,int muvolume)
-/*
-{
-	msun mop;
-	const int n=3;
-	static int set4_l1[n]={1,2,3};
-	static int set4_l2[n]={1,2,3};
-	#pragma unroll
-	for(int i=0; i<n; i++){
-		mop=MO4<UseTex, Real, atype>(arg, id, set4_l1[i] , set4_l2[i] ,link , muvolume);
-		GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + index* DEVPARAMS::Volume, gfoffset1);
-		index++;
-	}
-}
-*/
-//DEVICE msun MO3(WLOPArg<Real> arg,int id, int lx1, int ly,int lx2,msun link, int muvolume)
-/*
-{
-	msun mop;
-	const int n=3;
-	static int set3_l1[n]={1,1,1};
-	static int set3_l2[n]={1,1,2};
-	static int set3_l3[n]={1,2,1};
-	#pragma unroll
-	for(int i=0; i<n; i++){
-		mop=MO3<UseTex, Real, atype>(arg, id, set3_l1[i], set3_l2[i],set3_l3[i],link, muvolume);
-		GAUGE_SAVE<SOA, Real>( arg.fieldOp, mop, id + index* DEVPARAMS::Volume, gfoffset1);
-		index++;
-	}
-}
-*/
-}
-//////////////////////////////////////
-// end of kernal for calculation of //
-// operators                        //
-//////////////////////////////////////
 template <bool UseTex, class Real, ArrayType atype> 
 class CalcOPsF_A0: Tunable{
 private:
@@ -305,7 +281,7 @@ return tmp;}
 
 
 template<bool UseTex, class Real>
-void CalcWLOPs_A0(gauge array, Sigma_g_plus<Real> *arg, int radius, int mu){
+void CalcWLOPs_A0(gauge array, symmetry_sector<Real> *arg, int radius, int mu){
   Timer mtime;
   mtime.start(); 
   WLOPArg<Real> argK;
@@ -314,6 +290,7 @@ void CalcWLOPs_A0(gauge array, Sigma_g_plus<Real> *arg, int radius, int mu){
 	argK.radius = radius;
 	argK.mu = mu;
 	argK.opN = arg->opN;
+	argK.symmetry=arg->symmetry;
 
   
   if(array.Type() != SOA || arg->fieldOp.Type() != SOA)
@@ -334,7 +311,7 @@ void CalcWLOPs_A0(gauge array, Sigma_g_plus<Real> *arg, int radius, int mu){
 
 
 template<class Real>
-void CalcWLOPs_A0(gauge array, Sigma_g_plus<Real> *arg, int radius, int mu){
+void CalcWLOPs_A0(gauge array, symmetry_sector<Real> *arg, int radius, int mu){
   if(PARAMS::UseTex){
     GAUGE_TEXTURE(array.GetPtr(), true);
     CalcWLOPs_A0<true, Real>(array, arg, radius, mu);
@@ -343,7 +320,7 @@ void CalcWLOPs_A0(gauge array, Sigma_g_plus<Real> *arg, int radius, int mu){
 }
 
 
-template void CalcWLOPs_A0<double>(gauged array, Sigma_g_plus<double> *arg, int radius, int mu);
+template void CalcWLOPs_A0<double>(gauged array, symmetry_sector<double> *arg, int radius, int mu);
 
 }
 

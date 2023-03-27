@@ -15,7 +15,7 @@
 #include <index.h>
 #include <device_PHB_OVR.h>
 #include <reunitlink.h>
-#include <staple.h>
+
 #include <comm_mpi.h>
 #include <exchange.h>
 #include <texture_host.h>
@@ -152,6 +152,7 @@ private:
    unsigned int minThreads() const { return size; }
    void apply(const cudaStream_t &stream){
         tp = tuneLaunch(*this, getTuning(), getVerbosity());
+        CUDA_SAFE_CALL(cudaMemset(arg.res, 0, (arg.radius + 1) * (arg.Tmax+1) * sizeof(complex)));
         kernel_WilsonLineSP<UseTex, Real, atype><<<tp.grid,tp.block, 0, stream>>>(arg);
 }
 public:

@@ -31,8 +31,8 @@ extern "C" {
     // linkage issues (duplicate symbols and such)
 #ifdef __CUDACC__
 //#define HOST __host__
-#define DEVICE __device__ inline
-#define HOSTDEVICE __host__ __device__ inline
+#define DEVICE __device__
+#define HOSTDEVICE __host__ __device__ 
 #define M_HOST __host__
 #define M_HOSTDEVICE __host__ __device__ inline
 #else
