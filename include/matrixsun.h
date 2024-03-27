@@ -876,8 +876,8 @@ sum+=a.e[2][2] * b.e[2][2];
   return sum;
 #else
   complex sum = complex::zero();
-  for(int i=0;i<3;i++)
-    for(int j=0;j<3;j++){
+  for(int i=0;i<NCOLORS;i++)
+    for(int j=0;j<NCOLORS;j++){
 	sum += a.e[i][j] * b.e[j][i];
     }
   return sum;
@@ -922,8 +922,8 @@ sum+=a.e[2][2].real() * b.e[2][2].real() - a.e[2][2].imag() * b.e[2][2].imag();
   return sum;
 #else
   Real sum = 0.0;
-  for(int i=0;i<3;i++)
-    for(int j=0;j<3;j++){
+  for(int i=0;i<NCOLORS;i++)
+    for(int j=0;j<NCOLORS;j++){
 	sum += a.e[i][j].real() * b.e[j][i].real() - a.e[i][j].imag() * b.e[j][i].imag();
     }
   return sum;
